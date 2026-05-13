@@ -75,15 +75,27 @@ class MockClient(LLMClient):
             except Exception:
                 pass
 
-        history_text = " ".join(m["content"] for m in messages)
-        for fact in re.finditer(
-            r"remember:\s*([\w\s]+?)\s*(?:=|is)\s*([^.\n]+)", history_text, re.I
+        history_text = "\n".join(m["content"] for m in messages)
+        facts: dict[str, str] = {}
+        # Single-fact 'Remember: KEY = VALUE' form.
+        for m in re.finditer(
+            r"remember:\s*([^=\n]+?)\s*=\s*([^\n.]+)", history_text, re.I
         ):
-            key, val = fact.group(1).strip(), fact.group(2).strip()
-            if re.search(rf"what\s+(?:is|was)\s+{re.escape(key)}", text, re.I):
+            facts[m.group(1).strip().lower()] = m.group(2).strip()
+        # Multi-fact bullet form: '- KEY = VALUE'.
+        for m in re.finditer(
+            r"^\s*[-*]\s*([^=\n]+?)\s*=\s*([^\n]+)$", history_text, re.M
+        ):
+            facts[m.group(1).strip().lower()] = m.group(2).strip()
+
+        probe_m = re.search(r"what\s+(?:is|was)\s+(.+?)\??\s*$", text, re.I)
+        if probe_m and facts:
+            queried = probe_m.group(1).strip().lower().rstrip("?")
+            if queried in facts:
+                val = facts[queried]
                 if rng.random() < self.error_rate:
                     val = val + "_wrong"
-                return f"{key} is {val}."
+                return f"{queried} is {val}."
 
         return "Acknowledged."
 

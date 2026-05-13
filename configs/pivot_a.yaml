@@ -1,0 +1,35 @@
+# Pivot A sweep parameters. Locked alongside PREREGISTRATION.md.
+
+self_consistency:
+  task: arithmetic
+  n_tasks: 40              # task instances
+  n_repeats: 25            # replays per task (paired across model pairs)
+  temperature: 0.0
+  max_tokens: 512
+
+context_rot:
+  task: multi_fact_needle  # harder than single-fact needle
+  n_tasks: 50
+  filler_counts: [0, 2, 5, 10, 20, 40]
+  filler_kinds: ["irrelevant", "related", "token_matched"]   # token_matched = control
+  temperature: 0.0
+  max_tokens: 256
+
+sycophancy:
+  task: arithmetic
+  n_tasks: 50
+  post_pushback_gaps: [0, 2, 5, 10]
+  pushback_conditions: ["wrong", "correct", "neutral"]       # correct/neutral = controls
+  temperature: 0.0
+  max_tokens: 256
+
+# Statistical plan
+analysis:
+  paired_test: mcnemar_exact
+  alpha: 0.05
+  multiple_comparisons: benjamini_hochberg
+  bootstrap_iters: 10000
+  bootstrap_ci_level: 0.95
+  primary_metric: accuracy            # is_correct at probe
+  effect_size_threshold:              # below this we call the effect null
+    cohens_h: 0.20

@@ -4,6 +4,7 @@ import random
 
 from ..types import Role, Turn
 from .base import Task, TaskInstance
+from .scoring import score_value
 
 
 _NEEDLE_FACTS = [
@@ -15,9 +16,7 @@ _NEEDLE_FACTS = [
 
 
 class NeedleQA(Task):
-    """Plant a single key=value fact in the first user turn, query for it
-    in the probe. Setup includes an assistant ack slot so the model has
-    'seen' the fact in its own output before the probe arrives."""
+    """Plant a single key=value fact in turn 1, query for it later."""
 
     name = "needle_qa_v1"
 
@@ -43,8 +42,10 @@ class NeedleQA(Task):
 
         return TaskInstance(
             task_id=f"needle-{seed}",
+            task_name=self.name,
             setup_turns=[system, plant, ack_slot],
             probe_question=f"What is {key}?",
             correct_answer=value,
+            scorer=score_value,
             metadata={"key": key, "value": value},
         )

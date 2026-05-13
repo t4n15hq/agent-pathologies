@@ -1,58 +1,32 @@
 #!/usr/bin/env bash
-# Run all three experiments across the recommended 4-model sweep.
-# Output JSONL files are namespaced by model so analysis can join across them.
+# Run all three experiments, config-driven.
 #
-# Usage:
-#   bash scripts/run_sweep.sh                # full v1 sweep
-#   bash scripts/run_sweep.sh --quick        # smaller (5 tasks) for sanity
+#   bash scripts/run_sweep.sh           # full sweep against configs/models.yaml
+#   bash scripts/run_sweep.sh --mock    # smoke test, no API
 #
-# Requires OPENROUTER_API_KEY in env (or .env loaded).
+# Resumable: re-running this script after a crash skips already-completed cells.
 
 set -euo pipefail
 
 PY=".venv/bin/python"
-PROVIDER="openrouter"
-N_TASKS=30
-N_REPEATS=20
-
-if [[ "${1-}" == "--quick" ]]; then
-    N_TASKS=5
-    N_REPEATS=5
+MOCK_FLAG=""
+if [[ "${1-}" == "--mock" ]]; then
+    MOCK_FLAG="--mock"
 fi
 
-MODELS=(
-    "qwen/qwen3.5-397b-a17b"
-    "deepseek/deepseek-v4-pro"
-    "z-ai/glm-4.7"
-    "anthropic/claude-opus-4.7"
-)
-
-slug() {
-    echo "$1" | tr '/.' '__'
+run_one () {
+    local exp="$1"
+    echo "=== $exp ==="
+    $PY "experiments/${exp}/run.py" $MOCK_FLAG --concurrency 8
+    $PY "experiments/${exp}/analyze.py"
+    echo
 }
 
-for m in "${MODELS[@]}"; do
-    s=$(slug "$m")
-    echo "=== $m ==="
+# Self-consistency first — gives the noise floor for the other two.
+run_one self_consistency
+run_one context_rot
+run_one sycophancy
 
-    echo "--- self_consistency ---"
-    $PY experiments/self_consistency/run.py \
-        --provider "$PROVIDER" --model "$m" \
-        --n-tasks "$N_TASKS" --n-repeats "$N_REPEATS" \
-        --out "data/${s}__self_consistency.jsonl"
-
-    echo "--- context_rot ---"
-    $PY experiments/context_rot/run.py \
-        --provider "$PROVIDER" --model "$m" \
-        --n-tasks "$N_TASKS" \
-        --out "data/${s}__context_rot.jsonl"
-
-    echo "--- sycophancy ---"
-    $PY experiments/sycophancy/run.py \
-        --provider "$PROVIDER" --model "$m" \
-        --n-tasks "$N_TASKS" \
-        --out "data/${s}__sycophancy.jsonl"
-done
-
-echo
-echo "All sweeps complete. Trajectories in data/"
+echo "All sweeps done."
+echo "Cross-experiment summary:"
+$PY scripts/pair_analysis.py

@@ -1,4 +1,6 @@
-"""Sycophancy persistence: wrong pushback, then re-probe after a gap."""
+"""Sycophancy persistence: original Q -> A, pushback, gap turns, re-probe.
+Three pushback conditions (wrong / correct / neutral) × four post-pushback
+gaps. Paired across instruct/reasoning siblings."""
 
 from __future__ import annotations
 
@@ -8,63 +10,104 @@ import random
 from pathlib import Path
 
 from agent_pathologies.client import get_client
-from agent_pathologies.conversation.pushback import wrong_pushback
+from agent_pathologies.config_loader import iter_run_specs, load_yaml, mock_run_specs
+from agent_pathologies.conversation.pushback import pushback
 from agent_pathologies.conversation.synthesizer import filler_turn_pair
-from agent_pathologies.runner import run_batch, run_trajectory, write_jsonl
+from agent_pathologies.runner import (
+    cell_key,
+    existing_cell_keys,
+    run_batch,
+    run_trajectory,
+    write_jsonl,
+)
 from agent_pathologies.tasks.arithmetic import MultiStepArithmetic
 from agent_pathologies.types import Role, Turn
 
 
-POST_PUSHBACK_GAPS = [0, 2, 5, 10]
-
-
 async def main(args: argparse.Namespace) -> None:
-    client = get_client(args.provider, args.model)
-    task = MultiStepArithmetic()
+    cfg = load_yaml(Path(args.config))["sycophancy"]
+    if args.mock:
+        specs = mock_run_specs()
+    else:
+        models_cfg = load_yaml(Path(args.models_config))
+        specs = list(iter_run_specs(models_cfg))
+
     out = Path(args.out)
-    out.unlink(missing_ok=True)
+    if args.fresh and out.exists():
+        out.unlink()
+    done = existing_cell_keys(out)
+    if done:
+        print(f"resume mode: skipping {len(done)} already-completed cells")
 
-    coros = []
-    for task_seed in range(args.n_tasks):
-        inst = task.sample(task_seed)
-        rng = random.Random(task_seed)
+    task = MultiStepArithmetic()
+    gaps = cfg["post_pushback_gaps"]
+    conditions = cfg["pushback_conditions"]
 
-        for gap in POST_PUSHBACK_GAPS:
-            turns = list(inst.setup_turns)  # system + Q + initial A slot
-            turns.extend(wrong_pushback(inst.correct_answer))
-            for _ in range(gap):
-                turns.extend(filler_turn_pair("irrelevant", rng))
-            turns.append(
-                Turn(role=Role.USER, content=f"Just to confirm: {inst.probe_question}")
-            )
-            turns.append(Turn(role=Role.ASSISTANT, content="", is_probe=True))
+    coros: list = []
+    total_planned = 0
+    skipped = 0
+    for spec in specs:
+        client = get_client(spec.provider, spec.model)
+        for task_seed in range(cfg["n_tasks"]):
+            inst = task.sample(task_seed)
+            for condition in conditions:
+                for gap in gaps:
+                    sweep_value = {"condition": condition, "post_gap": gap}
+                    seed = task_seed * 10_000 + gap * 100 + conditions.index(condition)
+                    total_planned += 1
+                    key = cell_key(spec.model, inst.task_id, sweep_value, seed)
+                    if key in done:
+                        skipped += 1
+                        continue
 
-            async def _one(inst=inst, turns=turns, gap=gap, task_seed=task_seed):
-                tj = await run_trajectory(
-                    client,
-                    turns,
-                    task_id=inst.task_id,
-                    experiment="sycophancy",
-                    correct_answer=inst.correct_answer,
-                    seed=task_seed * 100 + gap,
-                    temperature=args.temperature,
-                    sweep_value={"post_gap": gap},
-                )
-                write_jsonl(tj, out)
-                return tj
+                    rng = random.Random(seed)
+                    turns = list(inst.setup_turns)  # system + Q + initial A
+                    turns.extend(pushback(inst.correct_answer, condition))
+                    for _ in range(gap):
+                        turns.extend(filler_turn_pair("irrelevant", rng))
+                    turns.append(Turn(
+                        role=Role.USER,
+                        content=f"Just to confirm: {inst.probe_question}",
+                    ))
+                    turns.append(Turn(role=Role.ASSISTANT, content="", is_probe=True))
 
-            coros.append(_one())
+                    async def _one(spec=spec, client=client, inst=inst, turns=turns,
+                                   seed=seed, sweep_value=sweep_value):
+                        tj = await run_trajectory(
+                            client,
+                            turns,
+                            task_id=inst.task_id,
+                            task_name=inst.task_name,
+                            experiment="sycophancy",
+                            correct_answer=inst.correct_answer,
+                            scorer=inst.scorer,
+                            seed=seed,
+                            temperature=cfg["temperature"],
+                            sweep_value=sweep_value,
+                            max_tokens=cfg["max_tokens"],
+                            model_family=spec.family,
+                            model_role=spec.role,
+                            cost_spec=spec.cost_spec,
+                        )
+                        write_jsonl(tj, out)
+                        return tj
 
+                    coros.append(_one())
+
+    print(f"planned={total_planned}  skipped={skipped}  to_run={len(coros)}")
+    if not coros:
+        return
     results = await run_batch(coros, concurrency=args.concurrency)
-    print(f"wrote {len(results)} trajectories to {out}")
+    cost = sum((t.cost_usd or 0.0) for t in results)
+    print(f"completed {len(results)} trajectories; this-session cost ≈ ${cost:.4f}")
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--provider", default="mock")
-    p.add_argument("--model", default="mock-1")
-    p.add_argument("--n-tasks", type=int, default=30)
-    p.add_argument("--temperature", type=float, default=0.0)
-    p.add_argument("--concurrency", type=int, default=8)
+    p.add_argument("--config", default="configs/pivot_a.yaml")
+    p.add_argument("--models-config", default="configs/models.yaml")
+    p.add_argument("--mock", action="store_true")
     p.add_argument("--out", default="data/sycophancy.jsonl")
+    p.add_argument("--fresh", action="store_true")
+    p.add_argument("--concurrency", type=int, default=8)
     asyncio.run(main(p.parse_args()))

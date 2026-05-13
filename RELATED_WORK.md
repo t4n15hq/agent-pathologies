@@ -138,7 +138,18 @@ nobody has tried.
 
 ---
 
-## Recommended next step
+## Decision: Pivot A locked (2026-05-13)
+
+After the lit pass, **Pivot A is committed** as the paper direction. The
+testbed remains the same; the comparison axis is now within-family instruct
+vs reasoning. Full hypotheses, analysis plan, and stopping rules are in
+`PREREGISTRATION.md`.
+
+The remaining pivots (B mechanistic, C systematic-eval-on-Chinese-stack,
+D novel-perturbation) stay on the shelf as follow-up papers if a strong
+effect appears in A.
+
+## Why Pivot A
 
 **Pick Pivot A (reasoning vs non-reasoning).** Reasons:
 1. Reuses the testbed you've already built — zero engineering rework.

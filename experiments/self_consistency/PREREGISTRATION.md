@@ -1,0 +1,50 @@
+# Pre-Registration — self_consistency
+
+Locked alongside the root [PREREGISTRATION.md](../../PREREGISTRATION.md).
+
+## H₀ / H₁
+
+- **H₀:** Within a model family, instruct and reasoning siblings have the
+  same answer-divergence distribution across replays of the same task at T=0.
+- **H₁:** Within a model family, instruct and reasoning siblings have
+  *different* answer-divergence distributions.
+
+We are two-sided. We have no strong prior on which direction reasoning
+training pushes divergence (reasoning models could be more consistent because
+they re-derive, or *less* consistent because their longer chains amplify any
+sampling noise).
+
+## Operationalization
+
+- Task: `MultiStepArithmetic` (hardness=1) — strict integer scoring.
+- Per-task divergence: fraction of N replays whose extracted answer differs
+  from the modal answer.
+- Per-task mean is paired across roles by `task_id` — same `task_seed` is
+  run on both instruct and reasoning members of the pair.
+
+## Statistical test
+
+- **Paired Wilcoxon signed-rank** on divergence values per family.
+  Wilcoxon is appropriate because (a) divergence per task is bounded and
+  not Gaussian, (b) zero-differences are common (perfect consistency).
+- Bootstrap 95% CI on the per-task `(instruct - reasoning)` divergence
+  difference.
+- BH-corrected q-values across families.
+
+## Stopping rule
+
+Run the full N = 40 tasks × 25 replays per (model, task). No optional
+stopping.
+
+## Exclusions
+
+Per root §6. Excluded trajectories are dropped from divergence computation
+*for that (family, task)* but the task is still included if ≥ 3 replays
+survive on each side.
+
+## Falsification
+
+If q ≥ 0.05 for **all** families *and* the per-task delta has |median| <
+0.05 (5 percentage points of divergence) for all families, we report a
+null finding for this axis. Self-consistency is reported either way because
+it sets the noise floor for the other two axes.
