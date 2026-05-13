@@ -12,8 +12,7 @@ from agent_pathologies.budget import CostSpec, count_messages, count_tokens
 from agent_pathologies.config_loader import iter_run_specs, load_yaml
 from agent_pathologies.conversation.synthesizer import filler_turn_pair
 from agent_pathologies.conversation.pushback import pushback as make_pushback
-from agent_pathologies.tasks.arithmetic import MultiStepArithmetic
-from agent_pathologies.tasks.multi_fact_needle import MultiFactNeedle
+from agent_pathologies.tasks import get_task
 from agent_pathologies.types import Role, Turn
 
 
@@ -34,7 +33,7 @@ def _simulate_trajectory_tokens(turns: list[Turn], avg_response_tokens: int = 25
 
 
 def estimate_self_consistency(cfg: dict, spec_cost: CostSpec) -> tuple[int, int, int, float]:
-    task = MultiStepArithmetic(hardness=cfg.get("hardness", 1))
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
     inst = task.sample(0)
     n_traj = cfg["n_tasks"] * cfg["n_repeats"]
     inp, out = _simulate_trajectory_tokens(list(inst.setup_turns), avg_response_tokens=20)
@@ -43,7 +42,7 @@ def estimate_self_consistency(cfg: dict, spec_cost: CostSpec) -> tuple[int, int,
 
 def estimate_context_rot(cfg: dict, spec_cost: CostSpec) -> tuple[int, int, int, float]:
     import random
-    task = MultiFactNeedle(n_facts=cfg.get("n_facts", 4))
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
     inst = task.sample(0)
     total_calls = 0
     total_inp = 0
@@ -69,7 +68,7 @@ def estimate_context_rot(cfg: dict, spec_cost: CostSpec) -> tuple[int, int, int,
 
 def estimate_sycophancy(cfg: dict, spec_cost: CostSpec) -> tuple[int, int, int, float]:
     import random
-    task = MultiStepArithmetic()
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
     inst = task.sample(0)
     total_calls = 0
     total_inp = 0

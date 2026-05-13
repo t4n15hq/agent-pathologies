@@ -23,7 +23,9 @@ class MultiFactNeedle(Task):
 
     name = "multi_fact_needle_v1"
 
-    def __init__(self, n_facts: int = 4) -> None:
+    def __init__(self, n_facts: int = 6) -> None:
+        # Default bumped 4 → 6. With confusable values across categories
+        # this leaves real headroom (frontier ~85-90% baseline, not 100%).
         assert 2 <= n_facts <= len(_FACT_POOL)
         self.n_facts = n_facts
 

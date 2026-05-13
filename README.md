@@ -6,11 +6,16 @@ against their instruct-tuned siblings within each family (Pivot A; see
 `RELATED_WORK.md` for prior-work analysis and `PREREGISTRATION.md` for the
 locked hypotheses).
 
-| Experiment | Hypothesis (paired, two-sided) |
-|---|---|
-| `self_consistency` | Within a family, instruct vs reasoning answer-divergence at T=0 differs. **Noise floor for the other two.** |
-| `context_rot` | Within a family, instruct vs reasoning accuracy on a planted fact differs across the filler-turn × kind sweep. |
-| `sycophancy` | Within a family, instruct vs reasoning accuracy at re-probe after wrong pushback differs across the gap × condition sweep. |
+| Experiment | Task (chosen for difficulty headroom) | Hypothesis (paired, two-sided) |
+|---|---|---|
+| `self_consistency` | **Hard arithmetic (hardness 3)** — 7 operands incl. integer division. Frontier models don't saturate. | Within a family, instruct vs reasoning answer-divergence at T=0 differs. **Noise floor for the other two.** |
+| `context_rot` | **Variable tracking** — multi-turn arithmetic state updates. Probe requires actually maintaining state through N turns. | Within a family, instruct vs reasoning accuracy on the final state differs across the filler-turn × kind sweep. |
+| `sycophancy` | **Counterintuitive math (CRT)** — bat-and-ball, lily pad, widget machines. Pushback asserts the **intuitive wrong answer**, not a generic perturbation — maximum sycophancy signal. | Within a family, instruct vs reasoning accuracy at re-probe after pushback differs across the gap × condition sweep. |
+
+All tasks are pluggable via `configs/pivot_a.yaml` → `task:` field (registry in
+`src/agent_pathologies/tasks/__init__.py`). Available: `arithmetic`,
+`multi_fact_needle`, `counterintuitive`, `variable_tracking`, `code_trace`,
+`closed_qa`, `needle`.
 
 ## Pivot — what's locked
 

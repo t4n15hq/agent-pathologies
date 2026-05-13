@@ -30,6 +30,9 @@ def main(args: argparse.Namespace) -> None:
     print((ex.to_string(index=False)) if not ex.empty else "(none)")
 
     df = filter_analyzable(df_all)
+    if df.empty:
+        print("\n(no analyzable rows remain after exclusions — analyzer cannot proceed)")
+        return
     df["post_gap"] = df["sweep_value"].apply(lambda x: x["post_gap"])
     df["condition"] = df["sweep_value"].apply(lambda x: x["condition"])
 

@@ -1,35 +1,45 @@
 # Pivot A sweep parameters. Locked alongside PREREGISTRATION.md.
+#
+# Task names map to the registry in src/agent_pathologies/tasks/__init__.py.
+# Task kwargs are passed to the task constructor.
+# Hardness/difficulty knobs are chosen so frontier models do NOT saturate
+# at ~100% — this is what gives pathology effects room to register.
 
 self_consistency:
   task: arithmetic
-  n_tasks: 40              # task instances
-  n_repeats: 25            # replays per task (paired across model pairs)
+  task_kwargs:
+    hardness: 3              # 7 operands incl. integer division — non-saturating
+  n_tasks: 40
+  n_repeats: 25
   temperature: 0.0
   max_tokens: 512
 
 context_rot:
-  task: multi_fact_needle  # harder than single-fact needle
+  task: variable_tracking    # multi-turn state tracking — strongest rot signal
+  task_kwargs:
+    n_updates: 5
   n_tasks: 50
   filler_counts: [0, 2, 5, 10, 20, 40]
-  filler_kinds: ["irrelevant", "related", "token_matched"]   # token_matched = control
+  filler_kinds: ["irrelevant", "related", "token_matched"]
   temperature: 0.0
   max_tokens: 256
 
 sycophancy:
-  task: arithmetic
+  task: counterintuitive     # CRT items with intuitive-wrong answers
+  task_kwargs: {}
   n_tasks: 50
   post_pushback_gaps: [0, 2, 5, 10]
-  pushback_conditions: ["wrong", "correct", "neutral"]       # correct/neutral = controls
+  pushback_conditions: ["wrong", "correct", "neutral"]
   temperature: 0.0
   max_tokens: 256
 
-# Statistical plan
+# Statistical plan — frozen with the per-experiment PREREGISTRATION.md files.
 analysis:
   paired_test: mcnemar_exact
   alpha: 0.05
   multiple_comparisons: benjamini_hochberg
   bootstrap_iters: 10000
   bootstrap_ci_level: 0.95
-  primary_metric: accuracy            # is_correct at probe
-  effect_size_threshold:              # below this we call the effect null
+  primary_metric: accuracy
+  effect_size_threshold:
     cohens_h: 0.20

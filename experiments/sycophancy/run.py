@@ -20,7 +20,7 @@ from agent_pathologies.runner import (
     run_trajectory,
     write_jsonl,
 )
-from agent_pathologies.tasks.arithmetic import MultiStepArithmetic
+from agent_pathologies.tasks import get_task
 from agent_pathologies.types import Role, Turn
 
 
@@ -39,7 +39,8 @@ async def main(args: argparse.Namespace) -> None:
     if done:
         print(f"resume mode: skipping {len(done)} already-completed cells")
 
-    task = MultiStepArithmetic()
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
+    print(f"task: {task.name}")
     gaps = cfg["post_pushback_gaps"]
     conditions = cfg["pushback_conditions"]
 
@@ -62,7 +63,11 @@ async def main(args: argparse.Namespace) -> None:
 
                     rng = random.Random(seed)
                     turns = list(inst.setup_turns)  # system + Q + initial A
-                    turns.extend(pushback(inst.correct_answer, condition))
+                    turns.extend(pushback(
+                        inst.correct_answer,
+                        condition,
+                        wrong_answer_override=inst.intuitive_wrong_answer,
+                    ))
                     for _ in range(gap):
                         turns.extend(filler_turn_pair("irrelevant", rng))
                     turns.append(Turn(

@@ -10,7 +10,7 @@ from pathlib import Path
 from agent_pathologies.client import get_client
 from agent_pathologies.config_loader import iter_run_specs, load_yaml, mock_run_specs
 from agent_pathologies.runner import existing_cell_keys, cell_key, run_batch, run_trajectory, write_jsonl
-from agent_pathologies.tasks.arithmetic import MultiStepArithmetic
+from agent_pathologies.tasks import get_task
 
 
 async def main(args: argparse.Namespace) -> None:
@@ -28,7 +28,8 @@ async def main(args: argparse.Namespace) -> None:
     if done:
         print(f"resume mode: skipping {len(done)} already-completed cells")
 
-    task = MultiStepArithmetic(hardness=cfg.get("hardness", 1))
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
+    print(f"task: {task.name}")
 
     total_planned = 0
     skipped = 0
@@ -37,15 +38,16 @@ async def main(args: argparse.Namespace) -> None:
         client = get_client(spec.provider, spec.model)
         for task_seed in range(cfg["n_tasks"]):
             inst = task.sample(task_seed)
+            request_seed = task_seed
             for repeat in range(cfg["n_repeats"]):
-                seed = task_seed * 10_000 + repeat
                 total_planned += 1
-                key = cell_key(spec.model, inst.task_id, repeat, seed)
+                key = cell_key(spec.model, inst.task_id, repeat, request_seed)
                 if key in done:
                     skipped += 1
                     continue
 
-                async def _one(spec=spec, client=client, inst=inst, seed=seed, repeat=repeat):
+                async def _one(spec=spec, client=client, inst=inst,
+                               seed=request_seed, repeat=repeat):
                     tj = await run_trajectory(
                         client,
                         inst.setup_turns,

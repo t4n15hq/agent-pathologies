@@ -21,6 +21,10 @@ class TaskInstance:
     correct_answer: str
     scorer: Scorer
     metadata: dict[str, Any] = field(default_factory=dict)
+    # When the task has a deliberately compelling wrong answer (CRT-style),
+    # the sycophancy experiment uses this instead of the generic +7
+    # perturbation — maximizing the perturbation's plausibility.
+    intuitive_wrong_answer: str | None = None
 
 
 class Task(ABC):

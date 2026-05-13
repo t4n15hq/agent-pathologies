@@ -58,7 +58,7 @@ class MockClient(LLMClient):
         text = last_user["content"]
 
         m = re.search(
-            r"(?:actually|no,?\s+it'?s|the (?:answer|correct)(?: is| should be))\s+([^\s.!?]+)",
+            r"(?:actually|no,?\s+it'?s|the (?:answer|correct)(?: is| should be))\s+(-?\d+|[A-D])\b",
             text,
             re.I,
         )
@@ -74,6 +74,29 @@ class MockClient(LLMClient):
                 return f"The answer is {value}."
             except Exception:
                 pass
+
+        # Variable-tracking: pretend to keep a tiny in-context calculator state.
+        # If text says 'What is the current value of x', evaluate the seen ops.
+        if re.search(r"current value of\s+x", text, re.I):
+            x = self._evaluate_variable_track(messages)
+            if x is not None:
+                if rng.random() < self.error_rate:
+                    x += rng.choice([-2, -1, 1, 2])
+                return f"The answer is {x}."
+
+        # Code-trace heuristic: emit a plausible integer so the pipeline
+        # gets a scorable answer (mock won't be correct, but accuracy is
+        # not what we measure on the mock).
+        if "```python" in text:
+            return "The answer is 0."
+
+        # Final fallback for any prompt that asks for an integer answer
+        # (e.g. CRT items): emit a deterministic integer derived from a
+        # hash of the question, so trajectories are scorable. The mock will
+        # not be *correct*, but the pipeline will exercise scoring + analysis.
+        if "the answer is n" in text.lower() or "respond with exactly" in text.lower():
+            stable = abs(hash(text)) % 100
+            return f"The answer is {stable}."
 
         history_text = "\n".join(m["content"] for m in messages)
         facts: dict[str, str] = {}
@@ -98,6 +121,30 @@ class MockClient(LLMClient):
                 return f"{queried} is {val}."
 
         return "Acknowledged."
+
+
+    @staticmethod
+    def _evaluate_variable_track(messages):
+        """Best-effort: replay the variable updates seen in chat history."""
+        x = None
+        for m in messages:
+            content = m.get("content", "")
+            init = re.search(r"x\s*=\s*(-?\d+)", content)
+            if init and x is None:
+                x = int(init.group(1))
+                continue
+            if x is None:
+                continue
+            add = re.search(r"add\s+(\d+)\s+to\s+x", content, re.I)
+            sub = re.search(r"subtract\s+(\d+)\s+from\s+x", content, re.I)
+            mul = re.search(r"multiply\s+x\s+by\s+(\d+)", content, re.I)
+            if add:
+                x += int(add.group(1))
+            elif sub:
+                x -= int(sub.group(1))
+            elif mul:
+                x *= int(mul.group(1))
+        return x
 
 
 class AnthropicClient(LLMClient):

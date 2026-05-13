@@ -58,8 +58,8 @@ def test_existing_cell_keys_resumability(tmp_path: Path):
     assert cell_key(tj.model, tj.task_id, tj.sweep_value, tj.seed) in keys
 
 
-def test_excluded_rows_not_counted_as_done(tmp_path: Path):
-    """If a trajectory is excluded, resuming should re-attempt it."""
+def test_excluded_rows_count_as_attempted(tmp_path: Path):
+    """Excluded trajectories are reported, not silently backfilled on resume."""
     out = tmp_path / "log.jsonl"
     # Hand-craft an excluded row
     row = {
@@ -75,7 +75,7 @@ def test_excluded_rows_not_counted_as_done(tmp_path: Path):
         "extra": {"cell_key": cell_key("m1", "t-1", 0, 1)},
     }
     out.write_text(json.dumps(row) + "\n")
-    assert existing_cell_keys(out) == set()
+    assert existing_cell_keys(out) == {cell_key("m1", "t-1", 0, 1)}
 
 
 def test_runner_attaches_model_family_role_and_tokens():

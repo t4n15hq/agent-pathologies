@@ -23,8 +23,12 @@ def cell_key(model: str, task_id: str, sweep_value: Any, seed: int | None) -> st
 
 
 def existing_cell_keys(path: Path) -> set[str]:
-    """Read a JSONL log and return the set of cell-keys already completed.
-    Used by experiment runners to resume an interrupted sweep."""
+    """Read a JSONL log and return the set of cell-keys already attempted.
+    Used by experiment runners to resume an interrupted sweep.
+
+    Excluded rows still count as attempted: the preregistration commits to
+    reporting exclusions rather than silently re-sampling them on resume.
+    """
     if not path.exists():
         return set()
     done: set[str] = set()
@@ -37,8 +41,6 @@ def existing_cell_keys(path: Path) -> set[str]:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if row.get("excluded"):
-                continue  # let excluded rows be re-attempted on resume
             key = row.get("extra", {}).get("cell_key")
             if key:
                 done.add(key)

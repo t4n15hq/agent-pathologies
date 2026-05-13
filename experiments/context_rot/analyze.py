@@ -29,6 +29,9 @@ def main(args: argparse.Namespace) -> None:
     print((ex.to_string(index=False)) if not ex.empty else "(none)")
 
     df = filter_analyzable(df_all)
+    if df.empty:
+        print("\n(no analyzable rows remain after exclusions — analyzer cannot proceed)")
+        return
     df["n_filler"] = df["sweep_value"].apply(lambda x: x["n_filler"])
     df["kind"] = df["sweep_value"].apply(lambda x: x["kind"])
 

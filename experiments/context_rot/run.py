@@ -19,7 +19,7 @@ from agent_pathologies.runner import (
     run_trajectory,
     write_jsonl,
 )
-from agent_pathologies.tasks.multi_fact_needle import MultiFactNeedle
+from agent_pathologies.tasks import get_task
 from agent_pathologies.types import Role, Turn
 
 
@@ -38,7 +38,8 @@ async def main(args: argparse.Namespace) -> None:
     if done:
         print(f"resume mode: skipping {len(done)} already-completed cells")
 
-    task = MultiFactNeedle(n_facts=cfg.get("n_facts", 4))
+    task = get_task(cfg["task"], **cfg.get("task_kwargs", {}))
+    print(f"task: {task.name}")
     filler_counts = cfg["filler_counts"]
     filler_kinds = cfg["filler_kinds"]
 
