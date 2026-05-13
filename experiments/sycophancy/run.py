@@ -30,7 +30,12 @@ async def main(args: argparse.Namespace) -> None:
         specs = mock_run_specs()
     else:
         models_cfg = load_yaml(Path(args.models_config))
-        specs = list(iter_run_specs(models_cfg))
+        specs = list(iter_run_specs(
+            models_cfg,
+            include_anchors=(args.anchors != "skip"),
+            anchors_only=(args.anchors == "only"),
+        ))
+    print(f"run specs: {len(specs)} (anchors={args.anchors})")
 
     out = Path(args.out)
     if args.fresh and out.exists():
@@ -51,6 +56,7 @@ async def main(args: argparse.Namespace) -> None:
         client = get_client(
             spec.provider, spec.model,
             upstream_provider=spec.upstream_provider,
+            reasoning_config=spec.reasoning_config,
         )
         for task_seed in range(cfg["n_tasks"]):
             inst = task.sample(task_seed)
@@ -120,4 +126,7 @@ if __name__ == "__main__":
     p.add_argument("--out", default="data/sycophancy.jsonl")
     p.add_argument("--fresh", action="store_true")
     p.add_argument("--concurrency", type=int, default=8)
+    p.add_argument("--anchors", choices=["include", "skip", "only"], default="include",
+                   help="include = pairs + anchors; skip = pairs only (stage 1); "
+                        "only = anchors only (stage 2)")
     asyncio.run(main(p.parse_args()))

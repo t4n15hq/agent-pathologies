@@ -178,10 +178,15 @@ class AnthropicClient(LLMClient):
 
 class OpenAICompatibleClient(LLMClient):
     """OpenAI /chat/completions wire format — Together, Fireworks, vLLM, Ollama,
-    OpenAI, OpenRouter. When `upstream_provider` is set (OpenRouter only), we
-    inject the provider routing config so OpenRouter pins this exact upstream
-    host and refuses to fall back. The actual upstream host that served the
-    request is surfaced on the LLMResponse for downstream verification."""
+    OpenAI, OpenRouter, DeepSeek direct, etc.
+
+    Two optional knobs:
+      - `upstream_provider`: OpenRouter-only. Pins routing to one upstream host
+        and disables fallback. The actually-served upstream is surfaced on the
+        LLMResponse so the runner can flag mismatches.
+      - `reasoning_config`: provider-specific reasoning toggle. For DeepSeek,
+        Anthropic-compatible reasoning models, and OpenRouter we inject the
+        provider's expected keys. None means default (provider's choice)."""
 
     def __init__(
         self,
@@ -191,13 +196,29 @@ class OpenAICompatibleClient(LLMClient):
         provider: str = "openai_compat",
         timeout: float = 120.0,
         upstream_provider: str | None = None,
+        reasoning_config: dict[str, Any] | None = None,
     ) -> None:
         self.model = model
         self.provider = provider
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or ""
         self.upstream_provider = upstream_provider
+        self.reasoning_config = reasoning_config
         self._http = httpx.AsyncClient(timeout=timeout)
+
+    def _inject_reasoning(self, payload: dict[str, Any]) -> None:
+        """Provider-specific reasoning-toggle injection.
+
+        deepseek_direct accepts `reasoning` (per https://api-docs.deepseek.com).
+        openrouter accepts `reasoning` (per https://openrouter.ai/docs/api-reference/parameters).
+        Both honor:
+          { "enabled": bool, "effort": "low|medium|high" }
+        We pass our config through verbatim; absence means "provider default"."""
+        cfg = self.reasoning_config
+        if not cfg:
+            return
+        if self.provider in ("openrouter", "deepseek_direct"):
+            payload["reasoning"] = dict(cfg)
 
     @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, min=2, max=30))
     async def complete(self, messages, temperature=0.0, max_tokens=1024, seed=None):
@@ -209,12 +230,12 @@ class OpenAICompatibleClient(LLMClient):
         }
         if seed is not None:
             payload["seed"] = seed
-        # OpenRouter provider pinning — only meaningful when talking to OpenRouter.
         if self.provider == "openrouter" and self.upstream_provider:
             payload["provider"] = {
                 "order": [self.upstream_provider],
                 "allow_fallbacks": False,
             }
+        self._inject_reasoning(payload)
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -224,13 +245,14 @@ class OpenAICompatibleClient(LLMClient):
         r.raise_for_status()
         data = r.json()
         text = data["choices"][0]["message"]["content"] or ""
-        # OpenRouter exposes the actual upstream both in the response body
-        # (`data["provider"]`) and as a response header (`x-openrouter-provider`).
-        # We prefer the body and fall back to the header.
+        # OpenRouter exposes the actual upstream in the response body
+        # (`data["provider"]`) and as a header (`x-openrouter-provider`).
+        # DeepSeek direct is its own upstream — we record the provider field.
         upstream_actual = (
             data.get("provider")
             or r.headers.get("x-openrouter-provider")
             or r.headers.get("X-OpenRouter-Provider")
+            or (self.provider if self.provider == "deepseek_direct" else None)
         )
         return LLMResponse(text=text, upstream_actual=upstream_actual)
 
@@ -240,15 +262,17 @@ def get_client(
     model: str,
     *,
     upstream_provider: str | None = None,
+    reasoning_config: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> LLMClient:
     """Provider factory.
 
-    Recognized providers: mock | openrouter | anthropic | together | fireworks
-    | vllm | ollama | openai.
+    Recognized providers: mock | openrouter | deepseek_direct | anthropic |
+    together | fireworks | vllm | ollama | openai.
 
-    `upstream_provider` is meaningful for OpenRouter (and quietly ignored by
-    other providers — clients that don't proxy to upstream hosts).
+    `upstream_provider` is meaningful for OpenRouter only (quietly ignored
+    elsewhere). `reasoning_config` is meaningful for OpenRouter and
+    deepseek_direct; it controls the model's reasoning/thinking toggle.
     """
     p = provider.lower()
     if p == "mock":
@@ -260,6 +284,16 @@ def get_client(
             api_key=kwargs.pop("api_key", os.environ.get("OPENROUTER_API_KEY")),
             provider="openrouter",
             upstream_provider=upstream_provider,
+            reasoning_config=reasoning_config,
+            **kwargs,
+        )
+    if p == "deepseek_direct":
+        return OpenAICompatibleClient(
+            model=model,
+            base_url=kwargs.pop("base_url", "https://api.deepseek.com/v1"),
+            api_key=kwargs.pop("api_key", os.environ.get("DEEPSEEK_API_KEY")),
+            provider="deepseek_direct",
+            reasoning_config=reasoning_config,
             **kwargs,
         )
     if p == "anthropic":

@@ -8,30 +8,31 @@
 self_consistency:
   task: arithmetic
   task_kwargs:
-    hardness: 3              # 7 operands incl. integer division — non-saturating
+    hardness: 3
   n_tasks: 40
   n_repeats: 25
   temperature: 0.0
-  max_tokens: 512
+  max_tokens: 1024           # bumped to 1024 in v2.3 — reasoning models need
+                             # headroom for thinking traces + final answer
 
 context_rot:
-  task: variable_tracking    # multi-turn state tracking — strongest rot signal
+  task: variable_tracking
   task_kwargs:
     n_updates: 5
   n_tasks: 50
   filler_counts: [0, 2, 5, 10, 20, 40]
   filler_kinds: ["irrelevant", "related", "token_matched", "collapsed"]
   temperature: 0.0
-  max_tokens: 256
+  max_tokens: 1024
 
 sycophancy:
-  task: counterintuitive     # CRT items with intuitive-wrong answers
+  task: counterintuitive
   task_kwargs: {}
   n_tasks: 50
   post_pushback_gaps: [0, 2, 5, 10]
   pushback_conditions: ["wrong", "correct", "neutral"]
   temperature: 0.0
-  max_tokens: 256
+  max_tokens: 1024
 
 # Statistical plan — frozen with the per-experiment PREREGISTRATION.md files.
 analysis:

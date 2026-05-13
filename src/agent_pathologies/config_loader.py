@@ -21,32 +21,46 @@ class RunSpec:
     provider: str
     cost_spec: CostSpec
     # Optional metadata used downstream to qualify or pin runs.
-    exploratory: bool = False           # pair violates same-base assumption
-    upstream_provider: str | None = None  # locked upstream host for replicability
+    exploratory: bool = False                          # pair violates same-base assumption
+    upstream_provider: str | None = None               # locked upstream host (OpenRouter)
+    reasoning_config: dict | None = None               # provider-specific reasoning toggle
 
 
 def load_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text())
 
 
-def iter_run_specs(models_cfg: dict, *, include_anchors: bool = True) -> Iterator[RunSpec]:
-    for pair in models_cfg.get("pairs", []):
-        family = pair["family"]
-        provider = pair.get("base_provider", "openrouter")
-        exploratory = bool(pair.get("exploratory", False))
-        for role_name, model_role in (("instruct", ModelRole.INSTRUCT),
-                                       ("reasoning", ModelRole.REASONING)):
-            entry = pair[role_name]
-            yield RunSpec(
-                family=family,
-                role=model_role,
-                model=entry["model"],
-                provider=provider,
-                cost_spec=CostSpec(entry["price_in_per_m"], entry["price_out_per_m"]),
-                exploratory=exploratory,
-                upstream_provider=entry.get("upstream_provider"),
-            )
-    if include_anchors:
+def iter_run_specs(
+    models_cfg: dict,
+    *,
+    include_anchors: bool = True,
+    anchors_only: bool = False,
+) -> Iterator[RunSpec]:
+    """Yield RunSpec entries from a parsed configs/models.yaml.
+
+    Staging knobs:
+      - include_anchors=False, anchors_only=False → pairs only (stage 1).
+      - include_anchors=True,  anchors_only=True  → anchors only (stage 2).
+      - include_anchors=True,  anchors_only=False → everything (default)."""
+    if not anchors_only:
+        for pair in models_cfg.get("pairs", []):
+            family = pair["family"]
+            provider = pair.get("base_provider", "openrouter")
+            exploratory = bool(pair.get("exploratory", False))
+            for role_name, model_role in (("instruct", ModelRole.INSTRUCT),
+                                           ("reasoning", ModelRole.REASONING)):
+                entry = pair[role_name]
+                yield RunSpec(
+                    family=family,
+                    role=model_role,
+                    model=entry["model"],
+                    provider=entry.get("provider", provider),
+                    cost_spec=CostSpec(entry["price_in_per_m"], entry["price_out_per_m"]),
+                    exploratory=exploratory,
+                    upstream_provider=entry.get("upstream_provider"),
+                    reasoning_config=entry.get("reasoning_config"),
+                )
+    if include_anchors or anchors_only:
         for anchor in models_cfg.get("anchors", []):
             family = anchor["family"]
             entry = anchor["instruct"]
@@ -59,6 +73,7 @@ def iter_run_specs(models_cfg: dict, *, include_anchors: bool = True) -> Iterato
                 cost_spec=CostSpec(entry["price_in_per_m"], entry["price_out_per_m"]),
                 exploratory=bool(anchor.get("exploratory", False)),
                 upstream_provider=entry.get("upstream_provider"),
+                reasoning_config=entry.get("reasoning_config"),
             )
 
 

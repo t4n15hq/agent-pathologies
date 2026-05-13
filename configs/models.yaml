@@ -1,39 +1,63 @@
-# Within-family instruct vs reasoning pairs for Pivot A.
-# Each pair should share base architecture/scale; only the post-training
-# differs. Pairs that violate this MUST set `exploratory: true` + `caveat:`.
-# Pricing snapshotted from openrouter.ai 2026-05-13 — refresh before re-running.
+# Within-family pairs for Pivot A. Two design patterns:
 #
-# upstream_provider is REQUIRED for replicability. OpenRouter defaults to
-# load-balancing across upstream hosts and falling back, which would silently
-# confound the paired test. We pin to one upstream and disallow fallback in
-# every API call (see OpenAICompatibleClient.complete). Verify each name at
-# https://openrouter.ai/<model>/providers before the real sweep.
+#   1. Within-MODEL reasoning toggle (DeepSeek V4 family). The SAME model
+#      is called twice — once with `reasoning: {enabled: false}` (instruct)
+#      and once with `reasoning: {effort: high}` (reasoning). Identical
+#      weights, scale, base training, and serving host (pinned upstream);
+#      only the runtime reasoning flag differs.
+#   2. Within-FAMILY SKU pair (Qwen3). Alibaba ships separate instruct and
+#      thinking SKUs for the same base family.
+#
+# OpenRouter upstream_provider names below are pinned defaults that have
+# been verified to (a) accept our reasoning toggle, (b) return the actual
+# upstream in the response so exclusion rule §6.4 can verify it. Pricing
+# snapshots from 2026-05-13; refresh before re-running.
+#
+# Why not DeepSeek direct: DeepSeek direct's v4-pro endpoint silently
+# ignores `reasoning: {enabled: false}` — only v4-flash supports the toggle
+# (via legacy `deepseek-chat`/`deepseek-reasoner` aliases). Using OpenRouter
+# for both gives uniform behavior; we lose DeepSeek's 75% v4-pro promo but
+# gain code-path simplicity and consistent pinning.
 
 pairs:
-  - family: deepseek-v
+  # --- DeepSeek V4-pro: within-MODEL reasoning toggle, pinned to Novita ---
+  - family: deepseek-v4-pro
     base_provider: openrouter
-    exploratory: true
-    caveat: >
-      deepseek-v4-pro and deepseek-r1-0528 differ in base architecture and
-      active-parameter count (~1.6T/49B-active vs ~671B/37B-active). This
-      pair is reported as EXPLORATORY; the paper's primary paired claims
-      rest on the Qwen pairs which share base architecture and scale.
     instruct:
       model: deepseek/deepseek-v4-pro
-      upstream_provider: DeepSeek
+      upstream_provider: Novita
+      reasoning_config: {enabled: false}
       price_in_per_m: 0.43
       price_out_per_m: 0.87
     reasoning:
-      model: deepseek/deepseek-r1-0528
-      upstream_provider: DeepSeek
-      price_in_per_m: 0.50
-      price_out_per_m: 2.15
+      model: deepseek/deepseek-v4-pro
+      upstream_provider: Novita
+      reasoning_config: {effort: "high"}
+      price_in_per_m: 0.43
+      price_out_per_m: 0.87
 
+  # --- DeepSeek V4-flash: within-MODEL toggle, pinned to DeepInfra ---
+  - family: deepseek-v4-flash
+    base_provider: openrouter
+    instruct:
+      model: deepseek/deepseek-v4-flash
+      upstream_provider: DeepInfra
+      reasoning_config: {enabled: false}
+      price_in_per_m: 0.14
+      price_out_per_m: 0.28
+    reasoning:
+      model: deepseek/deepseek-v4-flash
+      upstream_provider: DeepInfra
+      reasoning_config: {effort: "high"}
+      price_in_per_m: 0.14
+      price_out_per_m: 0.28
+
+  # --- Qwen3 235b: SKU pair, pinned to discovered defaults ---
   - family: qwen3-235b
     base_provider: openrouter
     instruct:
       model: qwen/qwen3-235b-a22b-2507
-      upstream_provider: Alibaba
+      upstream_provider: Novita
       price_in_per_m: 0.07
       price_out_per_m: 0.10
     reasoning:
@@ -42,20 +66,22 @@ pairs:
       price_in_per_m: 0.15
       price_out_per_m: 1.50
 
+  # --- Qwen3 30b: SKU pair ---
   - family: qwen3-30b
     base_provider: openrouter
     instruct:
       model: qwen/qwen3-30b-a3b-instruct-2507
-      upstream_provider: Alibaba
+      upstream_provider: Nebius
       price_in_per_m: 0.09
       price_out_per_m: 0.30
     reasoning:
       model: qwen/qwen3-30b-a3b-thinking-2507
-      upstream_provider: Alibaba
+      upstream_provider: AtlasCloud
       price_in_per_m: 0.08
       price_out_per_m: 0.40
 
-# Closed-frontier anchors (instruct only; reasoning anchor optional and pricier).
+# Closed-frontier anchor — context only, not in paired tests.
+# Stage 2: enable with `--anchors only` after stage 1 cost is reviewed.
 anchors:
   - family: claude-4.7
     instruct:

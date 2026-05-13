@@ -20,18 +20,30 @@ sycophancy persistence. Each is operationalized in `experiments/<axis>/`.
 
 ## §2 Pairs under test
 
-Within-family instruct vs reasoning pairs (see `configs/models.yaml`):
+Two pair designs are used (see `configs/models.yaml`):
 
-1. `deepseek-v4-pro`  ↔  `deepseek-r1-0528`  **[exploratory]**
-2. `qwen3-235b-a22b-2507`  ↔  `qwen3-235b-a22b-thinking-2507`
-3. `qwen3-30b-a3b-instruct-2507`  ↔  `qwen3-30b-a3b-thinking-2507`
+**Within-MODEL reasoning toggle (DeepSeek V4 family):**
 
-The **DeepSeek pair is exploratory**: `v4-pro` (~1.6T total / 49B active) and
-`r1-0528` (~671B total / 37B active) differ in base architecture and scale,
-so the "post-training is the only varying factor" assumption is not strictly
-met. The paper's primary paired claims rest on the Qwen pairs. The DeepSeek
-pair is still reported as a secondary signal because the data is informative
-in aggregate, but no primary headline depends on it.
+1. `deepseek-v4-pro` instruct (reasoning disabled) ↔ `deepseek-v4-pro` reasoning (reasoning enabled, high effort)
+2. `deepseek-v4-flash` instruct (reasoning disabled) ↔ `deepseek-v4-flash` reasoning (reasoning enabled)
+
+Both members of each pair are the **same model weights** served by DeepSeek
+direct (`api.deepseek.com`). The only runtime difference is the `reasoning`
+parameter sent in the request. This is the strongest controlled comparison
+possible — base architecture, scale, training run, and serving host are all
+held constant; only the reasoning toggle varies.
+
+**Within-FAMILY SKU pair (Qwen3):**
+
+3. `qwen3-235b-a22b-2507` (instruct) ↔ `qwen3-235b-a22b-thinking-2507`
+4. `qwen3-30b-a3b-instruct-2507` ↔ `qwen3-30b-a3b-thinking-2507`
+
+Alibaba ships separate instruct and thinking SKUs for the same base family
+and parameter count. These are served via OpenRouter with `upstream_provider`
+pinned per model (Novita / Alibaba / Nebius / AtlasCloud — see YAML).
+Note: within each Qwen pair, instruct and thinking variants are routed to
+different default upstream hosts, which is documented as a soft limitation
+of the pairing's serving-stack equivalence.
 
 All OpenRouter requests are **pinned to a single upstream provider** per
 model (`configs/models.yaml: upstream_provider`) with `allow_fallbacks: false`.
@@ -134,3 +146,18 @@ amendment, dated, and require a fresh sweep.
   (`configs/models.yaml: upstream_provider`) and exclusion rule §6.4
   is added to drop any trajectory whose actually-served upstream differs
   from the pinned one.
+- **2026-05-13 (further):** DeepSeek pair redesigned. The original
+  `v4-pro` ↔ `r1-0528` pairing (marked exploratory above) is dropped in
+  favor of TWO within-MODEL reasoning-toggle pairs: `v4-pro` ↔ `v4-pro`
+  and `v4-flash` ↔ `v4-flash`, with the `reasoning` parameter as the only
+  variable. Both halves of each pair share identical weights, scale, and
+  serving host (DeepSeek direct). The exploratory caveat is dropped — the
+  new design is a strictly controlled within-model comparison. The DeepSeek
+  pricing during this period benefits from a 75% promotional discount on
+  V4-pro through 2026-05-31 and provider-side prompt caching that makes
+  repeated identical prompts ~free.
+- **2026-05-13 (also):** Staged rollout flag added. The sweep can be run
+  in two stages via `--anchors skip` (pairs only) then `--anchors only`
+  (anchors only), with resumability ensuring stage 2 only runs new cells.
+  This lets the experimenter validate the Chinese open-weight slice and
+  observe actual costs before committing the Claude anchor.
