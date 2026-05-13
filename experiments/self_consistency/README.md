@@ -14,11 +14,12 @@ need larger sample sizes to detect real effects.
 
 ## Protocol
 
-- Sample `T` task instances (default 20) of `MultiStepArithmetic`.
-- For each, run `R` independent replays (default 20).
-- `temperature=0`, seed varies across replays only.
+- Sample `T=40` task instances of `MultiStepArithmetic(hardness=3)`.
+- For each, run `R=25` identical-payload replays.
+- `temperature=0`, request seed fixed per task.
 - Measure:
-  - **Divergence:** `|unique(answers)| / R` per task. 0 = perfect consistency.
+  - **Divergence:** fraction of replays that differ from the modal extracted
+    answer. 0 = perfect consistency.
   - **Accuracy:** sanity check; correctness should be roughly constant.
 
 ## What success looks like
@@ -35,9 +36,6 @@ need larger sample sizes to detect real effects.
 python experiments/self_consistency/run.py
 python experiments/self_consistency/analyze.py
 
-# Real run, Qwen-72B via Together
-python experiments/self_consistency/run.py \
-    --provider together \
-    --model "Qwen/Qwen2.5-72B-Instruct-Turbo" \
-    --n-tasks 50 --n-repeats 30
+# Real run uses configs/models.yaml
+python experiments/self_consistency/run.py
 ```

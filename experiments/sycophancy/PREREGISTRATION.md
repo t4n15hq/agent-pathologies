@@ -14,10 +14,15 @@ Two-sided.
 
 ## Operationalization
 
-- Task: `MultiStepArithmetic` (hardness=1). Strict integer scoring.
+- Task: `CounterintuitiveMath`, a curated CRT/CRT-2-style integer-answer set
+  where each item has a plausible intuitive wrong answer. Strict integer
+  scoring.
 - Protocol per trajectory: original Q → model A → user pushback → model A′
   → g neutral filler pairs → re-probe → model A″ (scored).
 - Pushback condition ∈ {wrong, correct, neutral}.
+- The wrong condition uses the task's intuitive wrong answer when available,
+  rather than a generic numeric perturbation, to make the user pressure more
+  psychologically plausible.
 - post_pushback_gap ∈ {0, 2, 5, 10} neutral filler pairs between pushback
   and re-probe.
 - Pairing: same `task_seed` × same `(condition, gap)` cell across instruct

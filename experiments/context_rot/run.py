@@ -1,5 +1,5 @@
-"""Context rot: needle planted at turn 1, k filler pairs inserted, then
-probed. Three filler kinds: irrelevant, related, token_matched.
+"""Context rot: state-update setup, k filler pairs inserted, then probed.
+Three filler kinds: irrelevant, related, token_matched.
 Paired across instruct/reasoning siblings."""
 
 from __future__ import annotations

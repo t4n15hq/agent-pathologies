@@ -34,7 +34,7 @@ reasoning vs non-reasoning).
 
 | Paper | Claim | Overlap |
 |---|---|---|
-| [Hong et al., "Measuring Sycophancy in Multi-turn Dialogues" / SYCON Bench (arXiv:2505.23840, EMNLP 2025)](https://arxiv.org/abs/2505.23840) | Introduces **Turn of Flip (ToF)** and **Number of Flip (NoF)** as metrics for sycophancy across multi-turn pressure. | 🔴 Literally your hypothesis, with named metrics. Published at EMNLP 2025. |
+| [Hong et al., "Measuring Sycophancy in Multi-turn Dialogues" / SYCON Bench (arXiv:2505.23840, EMNLP 2025)](https://arxiv.org/abs/2505.23840) | Introduces **Turn of Flip (ToF)** and **Number of Flip (NoF)** as metrics for sycophancy across multi-turn pressure; also reports that reasoning-optimized models generally resist sycophancy better than instruction-tuned variants. | 🔴 Literally your sycophancy hypothesis, with named metrics and a reasoning-vs-instruct result. Published at EMNLP 2025. |
 | [Fanous et al., "SycEval: Evaluating LLM Sycophancy" (arXiv:2502.08177)](https://arxiv.org/html/2502.08177v4) | Reports that **"once a model yields to a user assertion, agreement-seeking behavior often persists across subsequent turns"** — verbatim your hypothesis. | 🔴 Direct statement of your sycophancy persistence finding. |
 | ["Sycophancy under Pressure" (arXiv:2508.13743)](https://arxiv.org/html/2508.13743v1) | Adversarial dialogues for scientific QA sycophancy. | 🟡 Domain-specific; method differs. |
 | ["Sycophancy Is Not One Thing: Causal Separation" (arXiv:2509.21305)](https://arxiv.org/html/2509.21305v1) | Decomposes sycophantic behaviors causally. | 🟡 Mechanistic angle, complementary. |
@@ -90,14 +90,19 @@ siblings of the same family**: `deepseek-v4-pro` vs `deepseek-r1-0528`,
 **Hypothesis.** Reasoning-trained models trade off pathology-resistance
 differently than instruct-trained siblings. Either (a) reasoning models are
 more robust because they re-derive answers, or (b) they are *less* robust
-because they over-explain themselves into sycophantic reversals. Both are
-publishable; nobody has measured this cleanly.
+because they over-explain themselves into sycophantic reversals. Either
+direction is publishable if the paper stays framed as a paired multi-axis
+profile rather than a standalone sycophancy benchmark.
 
-**Why this works:** prior work mostly predates the reasoning-model wave or
-treats them as monolithic. A clean within-family comparison is a real gap.
-Testbed is reusable as-is.
+**Why this works:** the broad multi-axis, paired, no-LLM-judge comparison is
+still a useful gap. However, sycophancy alone is no longer enough, because
+SYCON already includes a reasoning-vs-instruction-tuned result. The strongest
+claim is the combined trajectory-pathology profile across context rot,
+sycophancy, and deterministic replay noise.
 
-**Risk:** low — almost certainly novel.
+**Risk:** medium — the paper must not sell "reasoning vs instruct
+sycophancy" as the main novelty. The novelty is the controlled, paired,
+multi-axis pathology profile.
 
 ### Pivot B — Mechanistic interpretability on one phenomenon
 Pick one (probably context rot), load Qwen3-32B locally via `transformers`,
@@ -155,8 +160,8 @@ effect appears in A.
 1. Reuses the testbed you've already built — zero engineering rework.
 2. The model pairs exist on OpenRouter today (DeepSeek V4 vs R1, Qwen
    instruct vs thinking).
-3. Whatever the result, it's publishable: a clean "reasoning models are
-   more/less robust to multi-turn pathologies" finding is novel.
+3. Whatever the result, it's publishable if framed as a multi-axis pathology
+   profile, not as a standalone sycophancy benchmark.
 4. If a striking effect shows up on one phenomenon, you have a natural
    path into Pivot B (mechanistic) on that phenomenon.
 

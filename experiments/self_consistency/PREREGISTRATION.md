@@ -16,11 +16,15 @@ sampling noise).
 
 ## Operationalization
 
-- Task: `MultiStepArithmetic` (hardness=1) — strict integer scoring.
+- Task: `MultiStepArithmetic` (hardness=3) — strict integer scoring.
 - Per-task divergence: fraction of N replays whose extracted answer differs
   from the modal answer.
 - Per-task mean is paired across roles by `task_id` — same `task_seed` is
   run on both instruct and reasoning members of the pair.
+- Request payloads are identical across replays for a given `(model, task_id)`:
+  temperature is 0 and the API seed is held fixed at `task_seed`. This makes
+  the experiment a true deterministic-settings replay test rather than a
+  seed-sensitivity test.
 
 ## Statistical test
 
@@ -33,7 +37,7 @@ sampling noise).
 
 ## Stopping rule
 
-Run the full N = 40 tasks × 25 replays per (model, task). No optional
+Run the full N = 40 tasks × 25 replays per model. No optional
 stopping.
 
 ## Exclusions

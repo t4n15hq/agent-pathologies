@@ -1,5 +1,6 @@
 """One-shot cross-experiment summary. Loads all three JSONL outputs,
-computes the headline paired numbers per family, prints + writes CSV."""
+computes the preregistered headline paired numbers per family, prints +
+writes CSV."""
 
 from __future__ import annotations
 
@@ -7,12 +8,17 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+from scipy.stats import wilcoxon
 
-from agent_pathologies.analysis.metrics import filter_analyzable, load_jsonl
+from agent_pathologies.analysis.metrics import (
+    answer_divergence,
+    filter_analyzable,
+    load_jsonl,
+)
 from agent_pathologies.analysis.stats import paired_test
 
 
-def headline_row(df: pd.DataFrame, experiment: str, cell_filter):
+def accuracy_headline_rows(df: pd.DataFrame, experiment: str, cell_filter):
     rows = []
     df = df[df["experiment"] == experiment]
     pair_families = [f for f in df["model_family"].unique()
@@ -32,11 +38,64 @@ def headline_row(df: pd.DataFrame, experiment: str, cell_filter):
         rows.append({
             "experiment": experiment,
             "family": family,
+            "metric": "accuracy",
             "n_paired": res.n,
-            "acc_instruct": res.p_a,
-            "acc_reasoning": res.p_b,
+            "value_instruct": res.p_a,
+            "value_reasoning": res.p_b,
+            "delta_instruct_minus_reasoning": res.p_a - res.p_b,
             "cohens_h": res.cohens_h,
             "p_value": res.p_value,
+        })
+    return rows
+
+
+def self_consistency_rows(df: pd.DataFrame):
+    rows = []
+    df = df[df["experiment"] == "self_consistency"]
+    if df.empty:
+        return rows
+
+    per_task_rows = []
+    for (family, role, task_id), grp in df.groupby(["model_family", "model_role", "task_id"]):
+        if len(grp) < 3:
+            continue
+        per_task_rows.append({
+            "family": family,
+            "role": role,
+            "task_id": task_id,
+            "divergence": answer_divergence(grp["probe_answer"].tolist()),
+        })
+    per_task = pd.DataFrame(per_task_rows)
+    if per_task.empty:
+        return rows
+
+    pair_families = [f for f in per_task["family"].unique()
+                     if {"instruct", "reasoning"}.issubset(
+                         set(per_task[per_task["family"] == f]["role"].unique())
+                     )]
+    for family in pair_families:
+        sub = per_task[per_task["family"] == family]
+        instr = sub[sub["role"] == "instruct"].set_index("task_id")["divergence"]
+        reas = sub[sub["role"] == "reasoning"].set_index("task_id")["divergence"]
+        common = instr.index.intersection(reas.index)
+        if len(common) < 5:
+            continue
+        a, b = instr.loc[common], reas.loc[common]
+        diff = a.values - b.values
+        if (diff == 0).all():
+            p_value = 1.0
+        else:
+            p_value = float(wilcoxon(a.values, b.values, zero_method="wilcox").pvalue)
+        rows.append({
+            "experiment": "self_consistency",
+            "family": family,
+            "metric": "answer_divergence",
+            "n_paired": int(len(common)),
+            "value_instruct": float(a.mean()),
+            "value_reasoning": float(b.mean()),
+            "delta_instruct_minus_reasoning": float(diff.mean()),
+            "cohens_h": float("nan"),
+            "p_value": p_value,
         })
     return rows
 
@@ -55,9 +114,7 @@ def main(args: argparse.Namespace) -> None:
     df = pd.concat(frames, ignore_index=True)
 
     rows: list[dict] = []
-    # self_consistency: cell = all-replays-for-task → not directly comparable
-    # in is_correct form; we just compare marginal accuracy here.
-    rows += headline_row(df, "self_consistency", lambda d: d)
+    rows += self_consistency_rows(df)
 
     # context_rot: headline cell is largest filler count, irrelevant
     def ctx_cell(d):
@@ -66,7 +123,7 @@ def main(args: argparse.Namespace) -> None:
         d["kind"] = d["sweep_value"].apply(lambda x: x["kind"])
         max_k = d["n_filler"].max()
         return d[(d["kind"] == "irrelevant") & (d["n_filler"] == max_k)]
-    rows += headline_row(df, "context_rot", ctx_cell)
+    rows += accuracy_headline_rows(df, "context_rot", ctx_cell)
 
     # sycophancy: headline cell is condition=wrong, gap=0
     def syc_cell(d):
@@ -74,7 +131,7 @@ def main(args: argparse.Namespace) -> None:
         d["condition"] = d["sweep_value"].apply(lambda x: x["condition"])
         d["post_gap"] = d["sweep_value"].apply(lambda x: x["post_gap"])
         return d[(d["condition"] == "wrong") & (d["post_gap"] == 0)]
-    rows += headline_row(df, "sycophancy", syc_cell)
+    rows += accuracy_headline_rows(df, "sycophancy", syc_cell)
 
     if not rows:
         print("no paired data available across experiments")

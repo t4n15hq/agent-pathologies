@@ -23,8 +23,9 @@ This is **Pivot A** (within-family instruct ↔ reasoning comparison) — chosen
 because the original "measure these pathologies cleanly" framing turned out
 to be heavily covered by 2025 papers (SYCON, SycEval, "LLMs Get Lost in
 Multi-Turn", non-determinism work — full table in `RELATED_WORK.md`). Pivot A
-keeps the same testbed but compares across post-training regimes, which is
-genuinely under-studied.
+keeps the same testbed but compares across post-training regimes. The viable
+novelty is the controlled **multi-axis** pathology profile, not sycophancy
+alone.
 
 Hypotheses, primary metric, effect-size threshold, multiple-comparisons plan,
 and exclusion rules are frozen in `PREREGISTRATION.md` (root) and
@@ -66,7 +67,7 @@ python scripts/pair_analysis.py
 ```
 
 Estimated total cost for the full v2 sweep across all paired families +
-Claude anchor: **~$40** (heavily dominated by the Claude anchor; ~$9 without
+Claude anchor: **~$54** (heavily dominated by the Claude anchor; ~$12 without
 it). Reasoning models can spend 3–10x more if they emit long thinking
 traces — budget headroom.
 
@@ -84,7 +85,8 @@ traces — budget headroom.
   arithmetic answer of "8" does not falsely match the operand "8" copied
   back into a model's response.
 - **Control conditions.**
-  - `context_rot.kind = token_matched` isolates "many turns" from "many tokens".
+  - `context_rot.kind = token_matched` controls generated/freeform filler
+    content with fixed filler transcripts at the same turn counts.
   - `sycophancy.condition = correct` + `= neutral` isolate generic
     capitulation from wrong-belief adoption — the interpretable signal is
     `acc(correct) − acc(wrong)`.
@@ -97,7 +99,7 @@ traces — budget headroom.
 - **Token + cost tracking.** Every trajectory carries `input_tokens`,
   `output_tokens`, `cost_usd`. `scripts/estimate_cost.py` projects total
   spend before you run.
-- **38 unit tests** covering scoring, synthesizers, statistical helpers, and
+- **51 unit tests** covering scoring, synthesizers, statistical helpers, and
   runner resumability. Run with `python -m pytest tests/`.
 
 ## Repo layout
@@ -118,7 +120,10 @@ src/agent_pathologies/
     scoring.py                  # Strict answer extraction
     arithmetic.py
     needle_qa.py                # Single-fact needle
-    multi_fact_needle.py        # N facts planted, one probed (context_rot)
+    multi_fact_needle.py        # N facts planted, one probed
+    variable_tracking.py        # running-state task for context_rot
+    counterintuitive_math.py    # CRT-style task for sycophancy
+    code_trace.py               # harder optional code-tracing task
     closed_qa.py                # Multiple-choice factual QA (for follow-ups)
   conversation/
     synthesizer.py              # 4 filler kinds incl. token_matched control
@@ -140,7 +145,7 @@ scripts/
   estimate_cost.py              # dry-run cost projection
   pair_analysis.py              # cross-experiment headline table
 
-tests/                          # 38 unit tests, pytest
+tests/                          # 51 unit tests, pytest
 data/                           # JSONL trajectories + analysis CSVs + PNG plots
 ```
 
@@ -168,7 +173,7 @@ deterministic given the data; randomness in bootstrap CIs is seeded.
 | Resumable runner + token/cost tracking | done |
 | Paired statistical analysis (McNemar, Wilcoxon, BH) | done |
 | Per-experiment pre-registrations | done |
-| Unit tests (38) | done |
+| Unit tests (51) | done |
 | Mock-provider smoke test (12,500 trajectories) | done |
 | Real-model sweep | awaiting OPENROUTER_API_KEY |
 | Mechanistic interp follow-up (Pivot B) | future paper |

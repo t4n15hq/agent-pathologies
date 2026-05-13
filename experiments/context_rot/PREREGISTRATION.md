@@ -5,7 +5,8 @@ Locked alongside the root [PREREGISTRATION.md](../../PREREGISTRATION.md).
 ## H₀ / H₁
 
 - **H₀:** Within a model family, instruct and reasoning siblings show the
-  same accuracy on a planted fact across the (n_filler × kind) sweep.
+  same accuracy on a running state-tracking task across the
+  (n_filler × kind) sweep.
 - **H₁:** They differ — reasoning training shifts the slope (or intercept)
   of the decay curve.
 
@@ -13,26 +14,25 @@ Two-sided.
 
 ## Operationalization
 
-- Task: `MultiFactNeedle` (n_facts = 4). Multiple facts planted simultaneously;
-  one is probed. Strict word-boundary scoring on the planted value.
+- Task: `VariableTracking` (n_updates = 5). The model must maintain a running
+  integer state across several earlier update turns, then report the final
+  value at probe. This gives more headroom than single-fact recall and is
+  scored with strict integer extraction.
 - Sweep:
   - `n_filler ∈ {0, 2, 5, 10, 20, 40}` user/assistant pairs inserted between
-    plant and probe.
+    the state-update setup and the final probe.
   - `kind ∈ {irrelevant, related, token_matched}`.
 - Pairing: same `task_seed` × same `(kind, n_filler)` cell on both instruct
   and reasoning members of each family.
 
 ## Control conditions
 
-- `irrelevant` filler — natural chitchat unrelated to the planted facts.
-- `related` filler — on-topic but not about the planted facts. Tests
-  whether topical proximity worsens forgetting.
-- `token_matched` filler — pre-filled short turns with controlled token
-  count. **This is the critical control:** comparing accuracy at
-  (kind=irrelevant, k=20) vs (kind=token_matched, k=20) isolates the
-  effect of *turn structure* from the confound of *token count*. If
-  accuracy is the same, what matters is just the number of turns. If
-  accuracy differs, content type or token volume drives the effect.
+- `irrelevant` filler — natural chitchat unrelated to the running variable.
+- `related` filler — math-adjacent but not about the tracked variable. Tests
+  whether topical proximity worsens state retention.
+- `token_matched` filler — pre-filled short turns with fixed transcript length.
+  This controls generated/freeform filler content at the same turn counts; it
+  is not a collapsed same-token single-turn control.
 
 ## Statistical test
 

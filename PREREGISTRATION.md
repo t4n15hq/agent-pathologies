@@ -45,9 +45,13 @@ interesting and we don't bias the protocol toward one.
 
 ## §4 Primary metric and effect-size threshold
 
-- **Primary metric:** `is_correct` at the designated probe turn (binary).
-- **Statistical test:** McNemar's exact test for paired binary outcomes,
-  computed per (pair × sweep-cell) and pooled across task instances.
+- **Primary metric:** `is_correct` at the designated probe turn (binary) for
+  `context_rot` and `sycophancy`; answer-divergence across identical replays
+  for `self_consistency`.
+- **Statistical test:** McNemar's exact test for paired binary outcomes in
+  `context_rot` and `sycophancy`, computed per (pair × sweep-cell) and pooled
+  across task instances. `self_consistency` uses paired Wilcoxon over
+  per-task divergence.
 - **Effect-size threshold:** **Cohen's h ≥ 0.20** on paired proportions. Below
   this we call the result a null finding *even if p < 0.05* (publication of
   null is fine; we'll report it).
@@ -99,4 +103,8 @@ amendment, dated, and require a fresh sweep.
 
 ## Amendment log
 
-*(none yet)*
+- **2026-05-13:** Updated task operationalizations before real-model data:
+  self-consistency now uses arithmetic hardness 3 with fixed replay seed;
+  context-rot now uses variable tracking; sycophancy now uses CRT-style
+  counterintuitive math with intuitive-wrong pushback. Existing data at this
+  point is mock-provider smoke data only.
