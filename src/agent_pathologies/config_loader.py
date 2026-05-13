@@ -20,6 +20,9 @@ class RunSpec:
     model: str
     provider: str
     cost_spec: CostSpec
+    # Optional metadata used downstream to qualify or pin runs.
+    exploratory: bool = False           # pair violates same-base assumption
+    upstream_provider: str | None = None  # locked upstream host for replicability
 
 
 def load_yaml(path: Path) -> dict:
@@ -30,6 +33,7 @@ def iter_run_specs(models_cfg: dict, *, include_anchors: bool = True) -> Iterato
     for pair in models_cfg.get("pairs", []):
         family = pair["family"]
         provider = pair.get("base_provider", "openrouter")
+        exploratory = bool(pair.get("exploratory", False))
         for role_name, model_role in (("instruct", ModelRole.INSTRUCT),
                                        ("reasoning", ModelRole.REASONING)):
             entry = pair[role_name]
@@ -39,6 +43,8 @@ def iter_run_specs(models_cfg: dict, *, include_anchors: bool = True) -> Iterato
                 model=entry["model"],
                 provider=provider,
                 cost_spec=CostSpec(entry["price_in_per_m"], entry["price_out_per_m"]),
+                exploratory=exploratory,
+                upstream_provider=entry.get("upstream_provider"),
             )
     if include_anchors:
         for anchor in models_cfg.get("anchors", []):
@@ -51,6 +57,8 @@ def iter_run_specs(models_cfg: dict, *, include_anchors: bool = True) -> Iterato
                 model=entry["model"],
                 provider=provider,
                 cost_spec=CostSpec(entry["price_in_per_m"], entry["price_out_per_m"]),
+                exploratory=bool(anchor.get("exploratory", False)),
+                upstream_provider=entry.get("upstream_provider"),
             )
 
 

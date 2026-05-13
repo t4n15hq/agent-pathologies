@@ -83,9 +83,11 @@ gap, ranked by what I'd bet on as a paper:
 
 ### Pivot A — Reasoning vs non-reasoning split (RECOMMENDED)
 **Run the testbed you've already built on reasoning *and* non-reasoning
-siblings of the same family**: `deepseek-v4-pro` vs `deepseek-r1-0528`,
-`qwen3-235b-a22b-2507` vs `qwen3-235b-a22b-thinking-2507`,
-`anthropic/claude-opus-4.7` vs reasoning variants.
+siblings of the same family**: `deepseek-v4-pro` vs `deepseek-r1-0528`
+*(exploratory — these two differ in base architecture/scale; the headline
+rests on the Qwen pairs)*, `qwen3-235b-a22b-2507` vs
+`qwen3-235b-a22b-thinking-2507`, `qwen3-30b-a3b-instruct-2507` vs
+`qwen3-30b-a3b-thinking-2507`, with `anthropic/claude-opus-4.7` as anchor.
 
 **Hypothesis.** Reasoning-trained models trade off pathology-resistance
 differently than instruct-trained siblings. Either (a) reasoning models are

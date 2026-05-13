@@ -10,7 +10,7 @@ import yaml
 
 from agent_pathologies.budget import CostSpec, count_messages, count_tokens
 from agent_pathologies.config_loader import iter_run_specs, load_yaml
-from agent_pathologies.conversation.synthesizer import filler_turn_pair
+from agent_pathologies.conversation.synthesizer import build_filler_block, filler_turn_pair
 from agent_pathologies.conversation.pushback import pushback as make_pushback
 from agent_pathologies.tasks import get_task
 from agent_pathologies.types import Role, Turn
@@ -52,8 +52,7 @@ def estimate_context_rot(cfg: dict, spec_cost: CostSpec) -> tuple[int, int, int,
     for kind in cfg["filler_kinds"]:
         for k in cfg["filler_counts"]:
             turns = list(inst.setup_turns)
-            for _ in range(k):
-                turns.extend(filler_turn_pair(kind, rng))
+            turns.extend(build_filler_block(kind, k, rng))
             turns.append(Turn(role=Role.USER, content=inst.probe_question))
             turns.append(Turn(role=Role.ASSISTANT, content="", is_probe=True))
             inp, out = _simulate_trajectory_tokens(turns, avg_response_tokens=15)

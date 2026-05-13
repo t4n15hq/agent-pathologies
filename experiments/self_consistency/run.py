@@ -35,7 +35,10 @@ async def main(args: argparse.Namespace) -> None:
     skipped = 0
     coros = []
     for spec in specs:
-        client = get_client(spec.provider, spec.model)
+        client = get_client(
+            spec.provider, spec.model,
+            upstream_provider=spec.upstream_provider,
+        )
         for task_seed in range(cfg["n_tasks"]):
             inst = task.sample(task_seed)
             request_seed = task_seed
@@ -56,6 +59,8 @@ async def main(args: argparse.Namespace) -> None:
                         experiment="self_consistency",
                         correct_answer=inst.correct_answer,
                         scorer=inst.scorer,
+                        upstream_pinned=spec.upstream_provider,
+                        exploratory=spec.exploratory,
                         seed=seed,
                         temperature=cfg["temperature"],
                         sweep_value=repeat,

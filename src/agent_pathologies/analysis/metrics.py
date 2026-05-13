@@ -71,6 +71,25 @@ def answer_divergence(answers: Iterable[str]) -> float:
     return 1.0 - (mode_freq / len(cleaned))
 
 
+def exploratory_families(df: pd.DataFrame) -> set[str]:
+    """Return the set of model_family values where any trajectory carries
+    `extra.exploratory == True`. Used by analyzers to tag rows."""
+    if df.empty or "extra" not in df.columns:
+        return set()
+    mask = df["extra"].apply(lambda x: bool(isinstance(x, dict) and x.get("exploratory")))
+    if not mask.any():
+        return set()
+    return set(df.loc[mask, "model_family"].dropna().unique())
+
+
+def tag_exploratory(family: str, exploratory: set[str]) -> str:
+    """Append a [exploratory] tag if the family is in the exploratory set.
+    Idempotent and safe to call on already-tagged strings."""
+    if family in exploratory and not family.endswith("[exploratory]"):
+        return f"{family} [exploratory]"
+    return family
+
+
 def exclusion_report(df: pd.DataFrame) -> pd.DataFrame:
     """Report exclusion counts per (model, exclusion_reason)."""
     if df.empty or "excluded" not in df.columns:

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from agent_pathologies.client import get_client
 from agent_pathologies.config_loader import iter_run_specs, load_yaml, mock_run_specs
-from agent_pathologies.conversation.synthesizer import filler_turn_pair
+from agent_pathologies.conversation.synthesizer import build_filler_block
 from agent_pathologies.runner import (
     cell_key,
     existing_cell_keys,
@@ -47,7 +47,10 @@ async def main(args: argparse.Namespace) -> None:
     total_planned = 0
     skipped = 0
     for spec in specs:
-        client = get_client(spec.provider, spec.model)
+        client = get_client(
+            spec.provider, spec.model,
+            upstream_provider=spec.upstream_provider,
+        )
         for task_seed in range(cfg["n_tasks"]):
             inst = task.sample(task_seed)
             rng_seed_base = task_seed * 100_000
@@ -63,8 +66,7 @@ async def main(args: argparse.Namespace) -> None:
 
                     rng = random.Random(seed)
                     turns = list(inst.setup_turns)
-                    for _ in range(k):
-                        turns.extend(filler_turn_pair(kind, rng))
+                    turns.extend(build_filler_block(kind, k, rng))
                     turns.append(Turn(role=Role.USER, content=inst.probe_question))
                     turns.append(Turn(role=Role.ASSISTANT, content="", is_probe=True))
 
@@ -78,6 +80,8 @@ async def main(args: argparse.Namespace) -> None:
                             experiment="context_rot",
                             correct_answer=inst.correct_answer,
                             scorer=inst.scorer,
+                            upstream_pinned=spec.upstream_provider,
+                            exploratory=spec.exploratory,
                             seed=seed,
                             temperature=cfg["temperature"],
                             sweep_value=sweep_value,

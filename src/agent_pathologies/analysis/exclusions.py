@@ -34,4 +34,13 @@ def exclusion_reason(traj: Trajectory, max_tokens: int = 512) -> str | None:
     if traj.is_correct is None:
         return "unscorable_answer"
 
+    # Rule 4 (preregistration §6): if a pinned upstream was requested and the
+    # actual upstream that served the call does not match, the paired test's
+    # determinism premise is broken for this trajectory. Drop it.
+    extra = traj.extra or {}
+    pinned = extra.get("upstream_pinned")
+    actual = extra.get("upstream_actual")
+    if pinned and actual and pinned.lower() != actual.lower():
+        return f"upstream_mismatch:{actual}!={pinned}"
+
     return None

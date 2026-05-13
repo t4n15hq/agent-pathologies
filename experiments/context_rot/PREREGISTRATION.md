@@ -21,7 +21,7 @@ Two-sided.
 - Sweep:
   - `n_filler ∈ {0, 2, 5, 10, 20, 40}` user/assistant pairs inserted between
     the state-update setup and the final probe.
-  - `kind ∈ {irrelevant, related, token_matched}`.
+  - `kind ∈ {irrelevant, related, token_matched, collapsed}`.
 - Pairing: same `task_seed` × same `(kind, n_filler)` cell on both instruct
   and reasoning members of each family.
 
@@ -31,8 +31,22 @@ Two-sided.
 - `related` filler — math-adjacent but not about the tracked variable. Tests
   whether topical proximity worsens state retention.
 - `token_matched` filler — pre-filled short turns with fixed transcript length.
-  This controls generated/freeform filler content at the same turn counts; it
-  is not a collapsed same-token single-turn control.
+  Controls generated/freeform filler content **at the same turn count**.
+- `collapsed` filler — **the true turn-vs-token control.** A single
+  user+assistant pair (2 turns) whose total token mass equals
+  `n_filler × AVG_TOKENS_PER_IRRELEVANT_PAIR`. Comparing accuracy at
+  (kind=irrelevant, k=20) vs (kind=collapsed, k=20) holds total token mass
+  approximately constant while changing turn count from 40 to 2 — this
+  isolates the *turn count* dimension of context rot from the *token mass*
+  dimension. (See `src/agent_pathologies/conversation/synthesizer.py:
+  build_filler_block` and `tests/test_synthesizer.py`.)
+
+## Amendment log
+
+- **2026-05-13:** Added `collapsed` filler kind so the sweep includes a true
+  turn-vs-token control (previously the disclaimer-only state). The kind
+  produces a single fat user+assistant pair sized to match the cumulative
+  token mass of k small filler pairs.
 
 ## Statistical test
 
@@ -43,8 +57,8 @@ Two-sided.
 
 ## Sample size
 
-N = 50 task instances × 6 filler counts × 3 kinds × (instruct + reasoning) per
-family = 1,800 trajectories per family. This gives ≥ 80% power to detect
+N = 50 task instances × 6 filler counts × 4 kinds × (instruct + reasoning) per
+family = 2,400 trajectories per family. This gives ≥ 80% power to detect
 h = 0.25 at α = 0.05 per cell.
 
 ## Falsification

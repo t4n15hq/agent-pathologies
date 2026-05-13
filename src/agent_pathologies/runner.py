@@ -13,6 +13,13 @@ from .tasks.base import Scorer
 from .types import ModelRole, Role, Trajectory, Turn
 
 
+def _normalize_response(r):
+    """Accept either an LLMResponse (new) or a bare string (legacy mocks)."""
+    if hasattr(r, "text"):
+        return r.text, getattr(r, "upstream_actual", None)
+    return str(r), None
+
+
 def cell_key(model: str, task_id: str, sweep_value: Any, seed: int | None) -> str:
     payload = json.dumps(
         {"model": model, "task": task_id, "sweep": sweep_value, "seed": seed},
@@ -63,26 +70,35 @@ async def run_trajectory(
     model_family: str | None = None,
     model_role: ModelRole | None = None,
     cost_spec: CostSpec | None = None,
+    upstream_pinned: str | None = None,
+    exploratory: bool = False,
 ) -> Trajectory:
     """Walk `turns`, generating any empty assistant turns. Score the last
-    is_probe turn. Capture errors, count tokens, attach cost, flag exclusions."""
+    is_probe turn. Capture errors, count tokens, attach cost, flag exclusions.
+    `upstream_pinned` is the OpenRouter upstream this client was *configured*
+    to use; the actually-served upstream (per-call) is collected and the
+    exclusion rule flags any mismatch."""
 
     materialized: list[Turn] = []
     history: list[dict[str, str]] = []
     input_tokens_total = 0
     output_tokens_total = 0
     error: str | None = None
+    upstream_actuals: list[str] = []
 
     try:
         for t in turns:
             if t.role == Role.ASSISTANT and not t.content:
                 input_tokens_total += count_messages(history, model=client.model)
-                answer = await client.complete(
+                response = await client.complete(
                     history,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     seed=seed,
                 )
+                answer, upstream_actual = _normalize_response(response)
+                if upstream_actual:
+                    upstream_actuals.append(upstream_actual)
                 output_tokens_total += count_tokens(answer, model=client.model)
                 new_turn = t.model_copy(update={"content": answer})
                 materialized.append(new_turn)
@@ -128,6 +144,10 @@ async def run_trajectory(
         sweep_value=sweep_value,
         extra={
             "cell_key": cell_key(client.model, task_id, sweep_value, seed),
+            "upstream_pinned": upstream_pinned,
+            "upstream_actual": upstream_actuals[-1] if upstream_actuals else None,
+            "upstream_observed_all": upstream_actuals,
+            "exploratory": exploratory,
         },
     )
     reason = exclusion_reason(traj, max_tokens=max_tokens)

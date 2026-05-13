@@ -11,8 +11,10 @@ import pandas as pd
 from agent_pathologies.analysis.metrics import (
     accuracy_with_ci,
     exclusion_report,
+    exploratory_families,
     filter_analyzable,
     load_jsonl,
+    tag_exploratory,
 )
 from agent_pathologies.analysis.plots import plot_paired_bars, plot_accuracy_curve
 from agent_pathologies.analysis.stats import benjamini_hochberg, paired_test
@@ -79,6 +81,11 @@ def main(args: argparse.Namespace) -> None:
         for r, qv in zip(paired_rows, q):
             r["q_value_bh"] = qv
         paired_df = pd.DataFrame(paired_rows)
+        explor = exploratory_families(df_all)
+        if explor:
+            paired_df["family"] = paired_df["family"].apply(
+                lambda f: tag_exploratory(f, explor)
+            )
         print()
         print("=== paired McNemar (instruct vs reasoning), context_rot ===")
         print(paired_df.to_string(index=False))

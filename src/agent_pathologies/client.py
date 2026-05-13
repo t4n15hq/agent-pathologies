@@ -5,10 +5,23 @@ import os
 import random
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+
+@dataclass
+class LLMResponse:
+    """Result of a single client.complete() call. Returning a structured
+    object (rather than a bare str) lets clients surface metadata like the
+    upstream host that served the request — needed for OpenRouter routing
+    pinning checks. The metadata is per-call, so concurrent coroutines
+    sharing a client don't race on shared instance state."""
+
+    text: str
+    upstream_actual: str | None = None
 
 
 class LLMClient(ABC):
@@ -22,18 +35,11 @@ class LLMClient(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1024,
         seed: int | None = None,
-    ) -> str: ...
+    ) -> LLMResponse: ...
 
 
 class MockClient(LLMClient):
-    """Deterministic-ish stand-in. Lets the whole pipeline run with no API key.
-
-    Behaviors that make the smoke tests informative:
-      - Solves arithmetic prompts via a sandboxed eval.
-      - Recalls 'Remember: X = Y' facts when later asked 'What is X?'.
-      - Flips on wrong pushback ('the answer is actually Z') with probability
-        `sycophancy_rate`.
-    """
+    """Deterministic-ish stand-in. Lets the whole pipeline run with no API key."""
 
     provider = "mock"
 
@@ -54,7 +60,7 @@ class MockClient(LLMClient):
             (m for m in reversed(messages) if m["role"] == "user"), None
         )
         if not last_user:
-            return "Ready."
+            return LLMResponse("Ready.")
         text = last_user["content"]
 
         m = re.search(
@@ -63,7 +69,7 @@ class MockClient(LLMClient):
             re.I,
         )
         if m and rng.random() < self.sycophancy_rate:
-            return f"You're right, I apologize — the answer is {m.group(1)}."
+            return LLMResponse(f"You're right, I apologize — the answer is {m.group(1)}.")
 
         expr = re.search(r"compute\s+(.+?)(?:\.|$)", text, re.I)
         if expr:
@@ -71,41 +77,30 @@ class MockClient(LLMClient):
                 value = eval(expr.group(1), {"__builtins__": {}}, {})  # noqa: S307
                 if rng.random() < self.error_rate:
                     value = int(value) + rng.choice([-2, -1, 1, 2])
-                return f"The answer is {value}."
+                return LLMResponse(f"The answer is {value}.")
             except Exception:
                 pass
 
-        # Variable-tracking: pretend to keep a tiny in-context calculator state.
-        # If text says 'What is the current value of x', evaluate the seen ops.
         if re.search(r"current value of\s+x", text, re.I):
             x = self._evaluate_variable_track(messages)
             if x is not None:
                 if rng.random() < self.error_rate:
                     x += rng.choice([-2, -1, 1, 2])
-                return f"The answer is {x}."
+                return LLMResponse(f"The answer is {x}.")
 
-        # Code-trace heuristic: emit a plausible integer so the pipeline
-        # gets a scorable answer (mock won't be correct, but accuracy is
-        # not what we measure on the mock).
         if "```python" in text:
-            return "The answer is 0."
+            return LLMResponse("The answer is 0.")
 
-        # Final fallback for any prompt that asks for an integer answer
-        # (e.g. CRT items): emit a deterministic integer derived from a
-        # hash of the question, so trajectories are scorable. The mock will
-        # not be *correct*, but the pipeline will exercise scoring + analysis.
         if "the answer is n" in text.lower() or "respond with exactly" in text.lower():
             stable = abs(hash(text)) % 100
-            return f"The answer is {stable}."
+            return LLMResponse(f"The answer is {stable}.")
 
         history_text = "\n".join(m["content"] for m in messages)
         facts: dict[str, str] = {}
-        # Single-fact 'Remember: KEY = VALUE' form.
         for m in re.finditer(
             r"remember:\s*([^=\n]+?)\s*=\s*([^\n.]+)", history_text, re.I
         ):
             facts[m.group(1).strip().lower()] = m.group(2).strip()
-        # Multi-fact bullet form: '- KEY = VALUE'.
         for m in re.finditer(
             r"^\s*[-*]\s*([^=\n]+?)\s*=\s*([^\n]+)$", history_text, re.M
         ):
@@ -118,10 +113,9 @@ class MockClient(LLMClient):
                 val = facts[queried]
                 if rng.random() < self.error_rate:
                     val = val + "_wrong"
-                return f"{queried} is {val}."
+                return LLMResponse(f"{queried} is {val}.")
 
-        return "Acknowledged."
-
+        return LLMResponse("Acknowledged.")
 
     @staticmethod
     def _evaluate_variable_track(messages):
@@ -150,7 +144,8 @@ class MockClient(LLMClient):
 class AnthropicClient(LLMClient):
     provider = "anthropic"
 
-    def __init__(self, model: str = "claude-sonnet-4-6", api_key: str | None = None) -> None:
+    def __init__(self, model: str = "claude-sonnet-4-6", api_key: str | None = None,
+                 **_ignored: Any) -> None:
         try:
             import anthropic  # type: ignore
         except ImportError as e:
@@ -177,12 +172,16 @@ class AnthropicClient(LLMClient):
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return "".join(block.text for block in resp.content if hasattr(block, "text"))
+        text = "".join(b.text for b in resp.content if hasattr(b, "text"))
+        return LLMResponse(text)
 
 
 class OpenAICompatibleClient(LLMClient):
-    """Talks to anything speaking OpenAI's /chat/completions wire format:
-    Together AI, Fireworks, vLLM, Ollama, OpenAI itself."""
+    """OpenAI /chat/completions wire format — Together, Fireworks, vLLM, Ollama,
+    OpenAI, OpenRouter. When `upstream_provider` is set (OpenRouter only), we
+    inject the provider routing config so OpenRouter pins this exact upstream
+    host and refuses to fall back. The actual upstream host that served the
+    request is surfaced on the LLMResponse for downstream verification."""
 
     def __init__(
         self,
@@ -191,11 +190,13 @@ class OpenAICompatibleClient(LLMClient):
         api_key: str | None = None,
         provider: str = "openai_compat",
         timeout: float = 120.0,
+        upstream_provider: str | None = None,
     ) -> None:
         self.model = model
         self.provider = provider
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or ""
+        self.upstream_provider = upstream_provider
         self._http = httpx.AsyncClient(timeout=timeout)
 
     @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, min=2, max=30))
@@ -208,6 +209,12 @@ class OpenAICompatibleClient(LLMClient):
         }
         if seed is not None:
             payload["seed"] = seed
+        # OpenRouter provider pinning — only meaningful when talking to OpenRouter.
+        if self.provider == "openrouter" and self.upstream_provider:
+            payload["provider"] = {
+                "order": [self.upstream_provider],
+                "allow_fallbacks": False,
+            }
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -216,14 +223,32 @@ class OpenAICompatibleClient(LLMClient):
         )
         r.raise_for_status()
         data = r.json()
-        return data["choices"][0]["message"]["content"] or ""
+        text = data["choices"][0]["message"]["content"] or ""
+        # OpenRouter exposes the actual upstream both in the response body
+        # (`data["provider"]`) and as a response header (`x-openrouter-provider`).
+        # We prefer the body and fall back to the header.
+        upstream_actual = (
+            data.get("provider")
+            or r.headers.get("x-openrouter-provider")
+            or r.headers.get("X-OpenRouter-Provider")
+        )
+        return LLMResponse(text=text, upstream_actual=upstream_actual)
 
 
-def get_client(provider: str, model: str, **kwargs: Any) -> LLMClient:
+def get_client(
+    provider: str,
+    model: str,
+    *,
+    upstream_provider: str | None = None,
+    **kwargs: Any,
+) -> LLMClient:
     """Provider factory.
 
     Recognized providers: mock | openrouter | anthropic | together | fireworks
     | vllm | ollama | openai.
+
+    `upstream_provider` is meaningful for OpenRouter (and quietly ignored by
+    other providers — clients that don't proxy to upstream hosts).
     """
     p = provider.lower()
     if p == "mock":
@@ -234,6 +259,7 @@ def get_client(provider: str, model: str, **kwargs: Any) -> LLMClient:
             base_url=kwargs.pop("base_url", "https://openrouter.ai/api/v1"),
             api_key=kwargs.pop("api_key", os.environ.get("OPENROUTER_API_KEY")),
             provider="openrouter",
+            upstream_provider=upstream_provider,
             **kwargs,
         )
     if p == "anthropic":

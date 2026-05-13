@@ -15,7 +15,7 @@ from agent_pathologies.analysis.metrics import (
     filter_analyzable,
     load_jsonl,
 )
-from agent_pathologies.analysis.stats import paired_test
+from agent_pathologies.analysis.stats import paired_did_bootstrap, paired_test
 
 
 def accuracy_headline_rows(df: pd.DataFrame, experiment: str, cell_filter):
@@ -100,6 +100,63 @@ def self_consistency_rows(df: pd.DataFrame):
     return rows
 
 
+def sycophancy_did_rows(df: pd.DataFrame, *, n_iters: int = 5000):
+    """Per-family paired DiD: reasoning(c−w) − instruct(c−w), pooled across
+    post-pushback gaps for a single headline number per family."""
+    rows = []
+    syc = df[df["experiment"] == "sycophancy"].copy()
+    if syc.empty:
+        return rows
+    syc["condition"] = syc["sweep_value"].apply(lambda x: x["condition"])
+    pair_families = [f for f in syc["model_family"].unique()
+                     if {"instruct", "reasoning"}.issubset(
+                         set(syc[syc["model_family"] == f]["model_role"].unique())
+                     )]
+    for family in pair_families:
+        sub = syc[syc["model_family"] == family]
+        try:
+            ic = sub[(sub["model_role"] == "instruct") & (sub["condition"] == "correct")
+                     ].set_index("task_id")["is_correct"]
+            iw = sub[(sub["model_role"] == "instruct") & (sub["condition"] == "wrong")
+                     ].set_index("task_id")["is_correct"]
+            rc = sub[(sub["model_role"] == "reasoning") & (sub["condition"] == "correct")
+                     ].set_index("task_id")["is_correct"]
+            rw = sub[(sub["model_role"] == "reasoning") & (sub["condition"] == "wrong")
+                     ].set_index("task_id")["is_correct"]
+        except KeyError:
+            continue
+        # Multiple rows per task_id (different gaps) — drop duplicates keeping mean.
+        for s in (ic, iw, rc, rw):
+            pass  # series may have repeats; mean below smooths over gaps.
+        ic = ic.groupby(level=0).mean()
+        iw = iw.groupby(level=0).mean()
+        rc = rc.groupby(level=0).mean()
+        rw = rw.groupby(level=0).mean()
+        common = ic.index.intersection(iw.index).intersection(
+            rc.index).intersection(rw.index)
+        if len(common) < 5:
+            continue
+        res = paired_did_bootstrap(
+            instr_correct=ic.loc[common].astype(float).tolist(),
+            instr_wrong=iw.loc[common].astype(float).tolist(),
+            reas_correct=rc.loc[common].astype(float).tolist(),
+            reas_wrong=rw.loc[common].astype(float).tolist(),
+            n_iters=n_iters,
+        )
+        rows.append({
+            "experiment": "sycophancy",
+            "family": family,
+            "metric": "did",
+            "n_paired": res.n_paired,
+            "value_instruct": res.instr_gap,
+            "value_reasoning": res.reas_gap,
+            "delta_instruct_minus_reasoning": -res.did,  # sign-aligned with other rows
+            "cohens_h": float("nan"),
+            "p_value": res.bootstrap_p,
+        })
+    return rows
+
+
 def main(args: argparse.Namespace) -> None:
     data_dir = Path(args.data_dir)
     frames = []
@@ -132,6 +189,7 @@ def main(args: argparse.Namespace) -> None:
         d["post_gap"] = d["sweep_value"].apply(lambda x: x["post_gap"])
         return d[(d["condition"] == "wrong") & (d["post_gap"] == 0)]
     rows += accuracy_headline_rows(df, "sycophancy", syc_cell)
+    rows += sycophancy_did_rows(df)
 
     if not rows:
         print("no paired data available across experiments")

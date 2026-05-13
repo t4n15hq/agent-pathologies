@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from agent_pathologies.analysis.stats import (
     benjamini_hochberg,
     bootstrap_ci,
@@ -70,3 +72,56 @@ def test_benjamini_hochberg_monotone_and_bounded():
 
 def test_benjamini_hochberg_empty_list():
     assert benjamini_hochberg([]) == []
+
+
+# -------- paired_did_bootstrap --------
+
+def test_paired_did_zero_when_arms_identical():
+    from agent_pathologies.analysis.stats import paired_did_bootstrap
+    # If reasoning's correct/wrong gap equals instruct's gap exactly, did = 0.
+    n = 30
+    res = paired_did_bootstrap(
+        instr_correct=[True] * (n // 2) + [False] * (n - n // 2),
+        instr_wrong=[False] * n,
+        reas_correct=[True] * (n // 2) + [False] * (n - n // 2),
+        reas_wrong=[False] * n,
+        n_iters=500,
+        seed=0,
+    )
+    assert abs(res.did) < 1e-9
+    assert res.instr_gap == res.reas_gap
+    # Two-sided p around 1 when both halves of the bootstrap distribution sit at 0.
+    assert res.bootstrap_p > 0.5
+
+
+def test_paired_did_positive_when_reasoning_resists_wrong_pushback():
+    from agent_pathologies.analysis.stats import paired_did_bootstrap
+    # Instruct: flips wrong→0% on wrong pushback, keeps 90% on correct.
+    # Reasoning: keeps 80% on wrong pushback, keeps 90% on correct.
+    # → instr_gap = 0.9 − 0.0 = 0.9
+    # → reas_gap  = 0.9 − 0.8 = 0.1
+    # → did = reas_gap − instr_gap = -0.8  (sign: reasoning gap is SMALLER)
+    n = 40
+    res = paired_did_bootstrap(
+        instr_correct=[True] * int(n * 0.9) + [False] * (n - int(n * 0.9)),
+        instr_wrong=[False] * n,
+        reas_correct=[True] * int(n * 0.9) + [False] * (n - int(n * 0.9)),
+        reas_wrong=[True] * int(n * 0.8) + [False] * (n - int(n * 0.8)),
+        n_iters=2000,
+        seed=1,
+    )
+    assert res.instr_gap > res.reas_gap
+    assert res.did < 0  # reasoning's gap is smaller (i.e. more sycophancy-robust)
+    assert res.bootstrap_p < 0.05
+    assert res.ci_lo < res.did < res.ci_hi
+
+
+def test_paired_did_raises_on_mismatched_lengths():
+    from agent_pathologies.analysis.stats import paired_did_bootstrap
+    with pytest.raises(ValueError):
+        paired_did_bootstrap(
+            instr_correct=[True, True],
+            instr_wrong=[False],
+            reas_correct=[True, True],
+            reas_wrong=[False, False],
+        )

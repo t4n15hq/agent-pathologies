@@ -4,7 +4,11 @@ import pytest
 
 from agent_pathologies.budget import count_tokens
 from agent_pathologies.conversation.pushback import pushback
-from agent_pathologies.conversation.synthesizer import filler_turn_pair
+from agent_pathologies.conversation.synthesizer import (
+    AVG_TOKENS_PER_IRRELEVANT_PAIR,
+    build_filler_block,
+    filler_turn_pair,
+)
 from agent_pathologies.types import Role
 
 
@@ -61,3 +65,53 @@ def test_pushback_correct_asserts_truth():
 def test_pushback_neutral_asserts_nothing():
     turns = pushback("202", "neutral")
     assert turns[0].metadata["asserted_answer"] is None
+
+
+# -------- collapsed filler (true turn-vs-token control) --------
+
+def test_collapsed_returns_exactly_two_turns_regardless_of_k():
+    """The whole point of the collapsed kind is that turn count is 2
+    regardless of k. Token mass scales with k; turn count does not."""
+    rng = random.Random(0)
+    for k in (1, 2, 5, 10, 20, 40):
+        block = build_filler_block("collapsed", k, rng)
+        assert len(block) == 2, f"k={k}: got {len(block)} turns, expected 2"
+        assert block[0].role == Role.USER
+        assert block[1].role == Role.ASSISTANT
+        assert block[1].content  # pre-filled, not empty
+        assert block[0].metadata["kind"] == "collapsed"
+        assert block[0].metadata["k_reference"] == k
+
+
+def test_collapsed_token_mass_matches_k_pairs_target():
+    """Token mass of the collapsed pair should approximate
+    k * AVG_TOKENS_PER_IRRELEVANT_PAIR within ±25%."""
+    rng = random.Random(0)
+    for k in (5, 10, 20):
+        block = build_filler_block("collapsed", k, rng)
+        actual = count_tokens(block[0].content) + count_tokens(block[1].content)
+        target = k * AVG_TOKENS_PER_IRRELEVANT_PAIR
+        assert abs(actual - target) <= target * 0.25, (
+            f"k={k}: actual={actual}, target={target} — outside ±25%"
+        )
+
+
+def test_collapsed_k_zero_returns_empty_block():
+    """k=0 means no filler at all — preserves the comparison cell."""
+    block = build_filler_block("collapsed", 0, random.Random(0))
+    assert block == []
+
+
+def test_build_filler_block_irrelevant_returns_k_pairs():
+    rng = random.Random(0)
+    for k in (0, 3, 7):
+        block = build_filler_block("irrelevant", k, rng)
+        assert len(block) == 2 * k
+
+
+def test_filler_turn_pair_rejects_collapsed_kind():
+    """filler_turn_pair cannot synthesize a collapsed pair (it needs k).
+    Calling it with kind='collapsed' must raise — callers should use
+    build_filler_block instead."""
+    with pytest.raises(ValueError):
+        filler_turn_pair("collapsed", random.Random(0))

@@ -48,7 +48,10 @@ async def main(args: argparse.Namespace) -> None:
     total_planned = 0
     skipped = 0
     for spec in specs:
-        client = get_client(spec.provider, spec.model)
+        client = get_client(
+            spec.provider, spec.model,
+            upstream_provider=spec.upstream_provider,
+        )
         for task_seed in range(cfg["n_tasks"]):
             inst = task.sample(task_seed)
             for condition in conditions:
@@ -86,6 +89,8 @@ async def main(args: argparse.Namespace) -> None:
                             experiment="sycophancy",
                             correct_answer=inst.correct_answer,
                             scorer=inst.scorer,
+                            upstream_pinned=spec.upstream_provider,
+                            exploratory=spec.exploratory,
                             seed=seed,
                             temperature=cfg["temperature"],
                             sweep_value=sweep_value,

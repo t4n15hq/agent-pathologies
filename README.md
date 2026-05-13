@@ -38,9 +38,20 @@ Defined in `configs/models.yaml`:
 
 | Family | Instruct | Reasoning |
 |---|---|---|
-| deepseek-v | `deepseek/deepseek-v4-pro` | `deepseek/deepseek-r1-0528` |
+| deepseek-v *(exploratory — see below)* | `deepseek/deepseek-v4-pro` | `deepseek/deepseek-r1-0528` |
 | qwen3-235b | `qwen/qwen3-235b-a22b-2507` | `qwen/qwen3-235b-a22b-thinking-2507` |
 | qwen3-30b | `qwen/qwen3-30b-a3b-instruct-2507` | `qwen/qwen3-30b-a3b-thinking-2507` |
+
+The **DeepSeek pair is reported as exploratory**: `v4-pro` and `r1-0528`
+differ in base architecture and active-parameter count, so the
+"post-training is the only varying factor" premise isn't strictly met.
+The headline rests on the Qwen pairs. See `PREREGISTRATION.md §2`.
+
+All OpenRouter requests are **pinned to a single upstream host per model**
+(`configs/models.yaml: upstream_provider`, `allow_fallbacks: false`). A
+trajectory served by a fallback upstream is excluded per
+`PREREGISTRATION.md §6.4`. Verify the pinned-host names against
+`https://openrouter.ai/<model>/providers` before the real sweep.
 
 Plus `anthropic/claude-opus-4.7` as a closed-frontier *anchor* — reported as
 a separate column for context only, not part of the paired tests.

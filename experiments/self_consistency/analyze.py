@@ -12,8 +12,10 @@ from scipy.stats import wilcoxon
 from agent_pathologies.analysis.metrics import (
     answer_divergence,
     exclusion_report,
+    exploratory_families,
     filter_analyzable,
     load_jsonl,
+    tag_exploratory,
 )
 from agent_pathologies.analysis.stats import benjamini_hochberg, bootstrap_ci
 
@@ -104,6 +106,11 @@ def main(args: argparse.Namespace) -> None:
         r["q_value_bh"] = qv
 
     out_df = pd.DataFrame(paired_rows)
+    explor = exploratory_families(df_all)
+    if explor:
+        out_df["family"] = out_df["family"].apply(
+            lambda f: tag_exploratory(f, explor)
+        )
     print(out_df.to_string(index=False))
 
     if args.csv_out:

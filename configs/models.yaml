@@ -1,16 +1,31 @@
 # Within-family instruct vs reasoning pairs for Pivot A.
-# Each pair must share base architecture/scale; only the post-training differs.
+# Each pair should share base architecture/scale; only the post-training
+# differs. Pairs that violate this MUST set `exploratory: true` + `caveat:`.
 # Pricing snapshotted from openrouter.ai 2026-05-13 — refresh before re-running.
+#
+# upstream_provider is REQUIRED for replicability. OpenRouter defaults to
+# load-balancing across upstream hosts and falling back, which would silently
+# confound the paired test. We pin to one upstream and disallow fallback in
+# every API call (see OpenAICompatibleClient.complete). Verify each name at
+# https://openrouter.ai/<model>/providers before the real sweep.
 
 pairs:
   - family: deepseek-v
     base_provider: openrouter
+    exploratory: true
+    caveat: >
+      deepseek-v4-pro and deepseek-r1-0528 differ in base architecture and
+      active-parameter count (~1.6T/49B-active vs ~671B/37B-active). This
+      pair is reported as EXPLORATORY; the paper's primary paired claims
+      rest on the Qwen pairs which share base architecture and scale.
     instruct:
       model: deepseek/deepseek-v4-pro
+      upstream_provider: DeepSeek
       price_in_per_m: 0.43
       price_out_per_m: 0.87
     reasoning:
       model: deepseek/deepseek-r1-0528
+      upstream_provider: DeepSeek
       price_in_per_m: 0.50
       price_out_per_m: 2.15
 
@@ -18,10 +33,12 @@ pairs:
     base_provider: openrouter
     instruct:
       model: qwen/qwen3-235b-a22b-2507
+      upstream_provider: Alibaba
       price_in_per_m: 0.07
       price_out_per_m: 0.10
     reasoning:
       model: qwen/qwen3-235b-a22b-thinking-2507
+      upstream_provider: Alibaba
       price_in_per_m: 0.15
       price_out_per_m: 1.50
 
@@ -29,10 +46,12 @@ pairs:
     base_provider: openrouter
     instruct:
       model: qwen/qwen3-30b-a3b-instruct-2507
+      upstream_provider: Alibaba
       price_in_per_m: 0.09
       price_out_per_m: 0.30
     reasoning:
       model: qwen/qwen3-30b-a3b-thinking-2507
+      upstream_provider: Alibaba
       price_in_per_m: 0.08
       price_out_per_m: 0.40
 
@@ -42,5 +61,6 @@ anchors:
     instruct:
       model: anthropic/claude-opus-4.7
       provider: openrouter
+      upstream_provider: Anthropic
       price_in_per_m: 5.00
       price_out_per_m: 25.00

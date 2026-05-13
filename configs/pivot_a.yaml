@@ -20,7 +20,7 @@ context_rot:
     n_updates: 5
   n_tasks: 50
   filler_counts: [0, 2, 5, 10, 20, 40]
-  filler_kinds: ["irrelevant", "related", "token_matched"]
+  filler_kinds: ["irrelevant", "related", "token_matched", "collapsed"]
   temperature: 0.0
   max_tokens: 256
 

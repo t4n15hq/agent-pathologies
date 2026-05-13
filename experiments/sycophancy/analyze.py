@@ -12,11 +12,17 @@ import pandas as pd
 from agent_pathologies.analysis.metrics import (
     accuracy_with_ci,
     exclusion_report,
+    exploratory_families,
     filter_analyzable,
     load_jsonl,
+    tag_exploratory,
 )
 from agent_pathologies.analysis.plots import plot_accuracy_curve, plot_paired_bars
-from agent_pathologies.analysis.stats import benjamini_hochberg, paired_test
+from agent_pathologies.analysis.stats import (
+    benjamini_hochberg,
+    paired_did_bootstrap,
+    paired_test,
+)
 
 
 def main(args: argparse.Namespace) -> None:
@@ -80,6 +86,11 @@ def main(args: argparse.Namespace) -> None:
         for r, qv in zip(paired_rows, q):
             r["q_value_bh"] = qv
         paired_df = pd.DataFrame(paired_rows)
+        explor = exploratory_families(df_all)
+        if explor:
+            paired_df["family"] = paired_df["family"].apply(
+                lambda f: tag_exploratory(f, explor)
+            )
         print()
         print("=== paired McNemar (instruct vs reasoning), sycophancy ===")
         print(paired_df.to_string(index=False))
@@ -87,6 +98,67 @@ def main(args: argparse.Namespace) -> None:
             Path(args.csv_out).parent.mkdir(parents=True, exist_ok=True)
             paired_df.to_csv(args.csv_out, index=False)
             print(f"wrote {args.csv_out}")
+
+    # --- between-model paired DiD: reasoning(c−w) − instruct(c−w) ---
+    # Co-primary outcome per sycophancy/PREREGISTRATION.md.
+    did_rows = []
+    for family in pair_families:
+        sub = df[df["model_family"] == family]
+        for gap in sorted(sub["post_gap"].unique()):
+            cell = sub[sub["post_gap"] == gap]
+            # Pivot on (role, condition) → is_correct, indexed by task_id.
+            try:
+                ic = cell[(cell["model_role"] == "instruct") & (cell["condition"] == "correct")
+                          ].set_index("task_id")["is_correct"]
+                iw = cell[(cell["model_role"] == "instruct") & (cell["condition"] == "wrong")
+                          ].set_index("task_id")["is_correct"]
+                rc = cell[(cell["model_role"] == "reasoning") & (cell["condition"] == "correct")
+                          ].set_index("task_id")["is_correct"]
+                rw = cell[(cell["model_role"] == "reasoning") & (cell["condition"] == "wrong")
+                          ].set_index("task_id")["is_correct"]
+            except KeyError:
+                continue
+            common = ic.index.intersection(iw.index).intersection(
+                rc.index).intersection(rw.index)
+            if len(common) < 5:
+                continue
+            res = paired_did_bootstrap(
+                instr_correct=ic.loc[common].astype(bool).tolist(),
+                instr_wrong=iw.loc[common].astype(bool).tolist(),
+                reas_correct=rc.loc[common].astype(bool).tolist(),
+                reas_wrong=rw.loc[common].astype(bool).tolist(),
+                n_iters=args.bootstrap_iters,
+            )
+            did_rows.append({
+                "family": family,
+                "post_gap": gap,
+                "n_paired": res.n_paired,
+                "instr_gap": res.instr_gap,
+                "reas_gap": res.reas_gap,
+                "did": res.did,
+                "ci_lo": res.ci_lo,
+                "ci_hi": res.ci_hi,
+                "bootstrap_p": res.bootstrap_p,
+            })
+
+    if did_rows:
+        q = benjamini_hochberg([r["bootstrap_p"] for r in did_rows])
+        for r, qv in zip(did_rows, q):
+            r["q_value_bh"] = qv
+        did_df = pd.DataFrame(did_rows)
+        explor_did = exploratory_families(df_all)
+        if explor_did:
+            did_df["family"] = did_df["family"].apply(
+                lambda f: tag_exploratory(f, explor_did)
+            )
+        print()
+        print("=== between-model DiD (reasoning vs instruct, correct − wrong) ===")
+        print("did > 0 ⇒ reasoning's gap is wider (more sycophancy-resistant in relative terms)")
+        print(did_df.to_string(index=False))
+        did_csv = Path(args.csv_out).parent / "sycophancy_did.csv"
+        did_csv.parent.mkdir(parents=True, exist_ok=True)
+        did_df.to_csv(did_csv, index=False)
+        print(f"wrote {did_csv}")
 
     # --- condition-delta within-model (sycophancy signature) ---
     cond_rows = []

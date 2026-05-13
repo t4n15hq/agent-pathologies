@@ -22,9 +22,21 @@ sycophancy persistence. Each is operationalized in `experiments/<axis>/`.
 
 Within-family instruct vs reasoning pairs (see `configs/models.yaml`):
 
-1. `deepseek-v4-pro`  ↔  `deepseek-r1-0528`
+1. `deepseek-v4-pro`  ↔  `deepseek-r1-0528`  **[exploratory]**
 2. `qwen3-235b-a22b-2507`  ↔  `qwen3-235b-a22b-thinking-2507`
 3. `qwen3-30b-a3b-instruct-2507`  ↔  `qwen3-30b-a3b-thinking-2507`
+
+The **DeepSeek pair is exploratory**: `v4-pro` (~1.6T total / 49B active) and
+`r1-0528` (~671B total / 37B active) differ in base architecture and scale,
+so the "post-training is the only varying factor" assumption is not strictly
+met. The paper's primary paired claims rest on the Qwen pairs. The DeepSeek
+pair is still reported as a secondary signal because the data is informative
+in aggregate, but no primary headline depends on it.
+
+All OpenRouter requests are **pinned to a single upstream provider** per
+model (`configs/models.yaml: upstream_provider`) with `allow_fallbacks: false`.
+Without pinning, OpenRouter load-balances across upstream hosts, which would
+silently confound the paired test.
 
 Closed-frontier anchor (no pair): `anthropic/claude-opus-4.7` (instruct-style).
 The anchor is **not** part of the paired test; it's reported as a single column
@@ -76,6 +88,12 @@ A trajectory is excluded from analysis if **and only if**:
    `src/agent_pathologies/analysis/exclusions.py` and frozen with this doc.
 3. Output exceeded `max_tokens` (truncated). Detected by missing terminating
    punctuation **and** length == max_tokens.
+4. **Upstream-provider mismatch.** The OpenRouter response's reported
+   `provider` (header `x-openrouter-provider` or body `provider`) does not
+   match the pinned `upstream_provider` from `configs/models.yaml`. This
+   means a fallback fired despite `allow_fallbacks: false` and the paired
+   test's "same upstream host across both members of the pair" premise is
+   violated. Frozen alongside the other three rules.
 
 Excluded trajectories are reported as a separate count per cell. We will
 **not** silently re-sample to backfill exclusions.
@@ -108,3 +126,11 @@ amendment, dated, and require a fresh sweep.
   context-rot now uses variable tracking; sycophancy now uses CRT-style
   counterintuitive math with intuitive-wrong pushback. Existing data at this
   point is mock-provider smoke data only.
+- **2026-05-13 (later):** Validity hardening before real-model data:
+  (a) DeepSeek pair marked exploratory because the two members differ in
+  base architecture and scale, so it is excluded from the primary paired
+  claim and reported as secondary;
+  (b) OpenRouter upstream-provider pinning is now required per model
+  (`configs/models.yaml: upstream_provider`) and exclusion rule §6.4
+  is added to drop any trajectory whose actually-served upstream differs
+  from the pinned one.
