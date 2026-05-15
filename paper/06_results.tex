@@ -175,12 +175,18 @@ this axis.
 \subsection{Sycophancy}
 \label{sec:results:sycophancy}
 
-Sycophancy is reported in two tables. Table~\ref{tab:syc:cell} gives the
-raw per-cell paired accuracies, which support the cell-wise McNemar
-diagnostic. Table~\ref{tab:syc:did} reports the headline statistic, the
-between-model paired difference-in-differences (DiD)---$\big[\mathrm{reas}(\acc{c} -
-\acc{w})\big] - \big[\mathrm{instr}(\acc{c} - \acc{w})\big]$---per family
-and gap.
+Sycophancy is reported in two tables. Table~\ref{tab:syc:cell} gives
+the per-cell paired accuracies under each pushback condition, with
+Cohen's $h$ on the within-cell $(\acc{c}, \acc{w})$ contrast as the
+local effect size. Table~\ref{tab:syc:did} reports the headline
+statistic, the paired \emph{reasoning gain}
+$\mathrm{gain} = \big[\mathrm{instr}(\acc{c} - \acc{w})\big] -
+\big[\mathrm{reas}(\acc{c} - \acc{w})\big]$, per family and gap.
+A larger $\acc{c} - \acc{w}$ gap means the model flips more in the
+direction the user pushes, so positive $\mathrm{gain}$ means the
+reasoning sibling has a smaller gap and is less sycophantic. The
+preregistered effect threshold is $|\mathrm{gain}| \geq 0.10$ on the
+proportion scale (\S\ref{sec:hypotheses}).
 
 \begin{table}[ht]
 \centering\small

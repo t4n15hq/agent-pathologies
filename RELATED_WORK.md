@@ -1,200 +1,230 @@
-# Related Work — and where your framing has prior-work risk
+# Related Work
 
-**TL;DR.** A focused arxiv pass turned up significant prior work for all three
-of the experiments you scoped. The original framing — "measure context rot,
-sycophancy persistence, and self-consistency cleanly across models" — is
-**mostly already published.** This document lists the closest prior works and
-proposes pivots that keep the testbed you've built but reposition the
-contribution.
+This document situates `agent-pathologies` against the three literatures
+it most directly speaks to — multi-turn conversational degradation,
+sycophancy, and inference non-determinism — plus a fourth (agent failure
+taxonomies) that frames the broader context. For each line of work we
+describe what the cited paper establishes, what its design choices
+constrain, and how the present study either re-uses or extends it.
 
-Risk legend: 🔴 HIGH (your idea is already published), 🟡 MEDIUM (related but
-your framing differs), 🟢 LOW (clear gap remains).
-
----
-
-## 1. Context Rot — 🔴 HIGH overlap
-
-| Paper | Claim | Overlap |
-|---|---|---|
-| [Laban et al., "LLMs Get Lost In Multi-Turn Conversation" (arXiv:2505.06120, May 2025)](https://arxiv.org/abs/2505.06120) | 200k+ simulated multi-turn conversations across six tasks → average **39% performance drop** vs single-turn. Decomposes into (small) aptitude loss + (large) unreliability increase. | 🔴 Covers the headline phenomenon you wanted to measure. Beating their 200k-conversation scale on the same finding is not realistic. |
-| ["Drift No More? Context Equilibria in Multi-Turn LLM Interactions" (arXiv:2510.07777)](https://arxiv.org/html/2510.07777v1) | Frames multi-turn instability as a context equilibrium problem. | 🟡 Same phenomenon, theoretical lens. |
-| ["Intent Mismatch Causes LLMs to Get Lost..." (arXiv:2602.07338)](https://arxiv.org/html/2602.07338v1) | Identifies intent mismatch as a primary driver of multi-turn degradation. | 🟡 Causal explanation work, separate from raw measurement. |
-| ["Conversation Tree Architecture" (arXiv:2603.21278)](https://arxiv.org/html/2603.21278) | Coins "logical context poisoning" — progressive corruption from structural context mismanagement. | 🟡 Adjacent framing. |
-| [NOLIMA (arXiv:2502.05167)](https://arxiv.org/pdf/2502.05167) | Long-context eval beyond literal matching. | 🟢 Adjacent — single-prompt, not multi-turn. |
-| [MemoryAgentBench (arXiv:2507.05257)](https://arxiv.org/html/2507.05257v1) | Memory-mechanism evaluation in agents via incremental multi-turn input. | 🟡 Tests memory architectures, not vanilla LLM forgetting. |
-
-**Verdict.** The vanilla "accuracy decays as filler turns pile up" curve is
-covered. Your only path forward on context rot is either (a) a mechanistic
-finding, or (b) a comparison axis nobody else ran (Chinese open weights,
-reasoning vs non-reasoning).
+The motivating observation is that each of these three pathologies has
+been studied in isolation, often on heterogeneous model panels that
+mix instruction-tuned and reasoning-tuned variants across families and
+scales. The gap we target is a *controlled paired comparison*:
+within-family instruct↔reasoning siblings tested on all three axes in
+the same experimental harness, with frozen hypotheses, exclusion
+classes, and effect-size thresholds. The point is not to re-measure
+any single axis at higher fidelity than the works below — it is to
+produce a coherent multi-axis profile of the reasoning-mode
+intervention that the panel-average results in the prior literature
+cannot disentangle.
 
 ---
 
-## 2. Sycophancy Persistence — 🔴 HIGH overlap (most exposed of the three)
+## 1. Multi-turn conversational degradation ("context rot")
 
-| Paper | Claim | Overlap |
-|---|---|---|
-| [Hong et al., "Measuring Sycophancy in Multi-turn Dialogues" / SYCON Bench (arXiv:2505.23840, EMNLP 2025)](https://arxiv.org/abs/2505.23840) | Introduces **Turn of Flip (ToF)** and **Number of Flip (NoF)** as metrics for sycophancy across multi-turn pressure; also reports that reasoning-optimized models generally resist sycophancy better than instruction-tuned variants. | 🔴 Literally your sycophancy hypothesis, with named metrics and a reasoning-vs-instruct result. Published at EMNLP 2025. |
-| [Fanous et al., "SycEval: Evaluating LLM Sycophancy" (arXiv:2502.08177)](https://arxiv.org/html/2502.08177v4) | Reports that **"once a model yields to a user assertion, agreement-seeking behavior often persists across subsequent turns"** — verbatim your hypothesis. | 🔴 Direct statement of your sycophancy persistence finding. |
-| ["Sycophancy under Pressure" (arXiv:2508.13743)](https://arxiv.org/html/2508.13743v1) | Adversarial dialogues for scientific QA sycophancy. | 🟡 Domain-specific; method differs. |
-| ["Sycophancy Is Not One Thing: Causal Separation" (arXiv:2509.21305)](https://arxiv.org/html/2509.21305v1) | Decomposes sycophantic behaviors causally. | 🟡 Mechanistic angle, complementary. |
-| ["Beacon: Single-Turn Diagnosis of Latent Sycophancy" (arXiv:2510.16727)](https://arxiv.org/html/2510.16727) | Single-turn detection of latent sycophantic tendencies. | 🟡 Different setting. |
-| ["The Price of Agreement: LLM Sycophancy in Financial Apps" (arXiv:2604.24668)](https://arxiv.org/html/2604.24668) | Sycophancy in agentic financial applications. | 🟢 Domain-specific, not method. |
-| [SycoEval-EM (arXiv:2601.16529)](https://arxiv.org/html/2601.16529) | Sycophancy benchmark in clinical encounters; reports DeepSeek-chat-v3.1 at **48% acquiescence rate**. | 🟡 Already evaluating DeepSeek. |
-| ["Fragility of Moral Judgment" (arXiv:2603.05651)](https://arxiv.org/html/2603.05651) | Sycophancy perturbations; evaluates DeepSeek-V3 and Qwen2.5-72B. | 🟡 Already evaluating Chinese open-weight on sycophancy. |
+**Laban et al., *LLMs Get Lost in Multi-Turn Conversation*
+([arXiv:2505.06120](https://arxiv.org/abs/2505.06120))** is the
+canonical reference. The authors run roughly 200,000 simulated
+multi-turn conversations across six tasks and report an average 39%
+performance drop relative to single-turn execution, decomposed into a
+small aptitude loss and a larger unreliability increase. The paper
+establishes that the degradation is real and large at panel scale; it
+does not isolate the reasoning-mode contrast, and its model panel is
+heterogeneous (different families, different post-training).
 
-**Verdict.** The most exposed of the three. SYCON and SycEval together cover
-the metric, the protocol, and the qualitative finding. Pivot or drop.
+**Drift No More? Context Equilibria in Multi-Turn LLM Interactions
+([arXiv:2510.07777](https://arxiv.org/html/2510.07777v1))** frames
+multi-turn instability as a context-equilibrium dynamical problem,
+giving a theoretical lens for the same phenomenon. **Intent Mismatch
+Causes LLMs to Get Lost in Multi-Turn Conversation
+([arXiv:2602.07338](https://arxiv.org/html/2602.07338v1))** isolates
+intent mismatch as one mechanistic driver of the degradation. The
+*Conversation Tree Architecture* paper
+([arXiv:2603.21278](https://arxiv.org/html/2603.21278)) introduces the
+"logical context poisoning" framing — progressive corruption of the
+conversation state from structural mismanagement. **NOLIMA
+([arXiv:2502.05167](https://arxiv.org/pdf/2502.05167))** extends
+long-context evaluation past literal substring matching. **MemoryAgentBench
+([arXiv:2507.05257](https://arxiv.org/html/2507.05257v1))** evaluates
+memory mechanisms in agentic systems via incremental multi-turn input;
+it studies architectural augmentations rather than vanilla LLM
+forgetting.
 
----
-
-## 3. Self-Consistency Drift — 🔴 HIGH overlap
-
-| Paper | Claim | Overlap |
-|---|---|---|
-| [Atil et al., "Non-Determinism of 'Deterministic' LLM Settings" (arXiv:2408.04667)](https://arxiv.org/abs/2408.04667) | Five LLMs, eight tasks, 10 runs each. Up to **15% accuracy variance** and 70% best-to-worst gap even with deterministic config. | 🔴 Direct measurement of your hypothesis. |
-| [He et al., "Understanding and Mitigating Numerical Sources of Nondeterminism in LLM Inference" (arXiv:2506.09501)](https://arxiv.org/pdf/2506.09501) | **Mechanistic explanation**: tiny logit gaps + BF16/FP16 numerical fluctuations. FP32 → near-deterministic; BF16 → significant variance. | 🔴 The mechanism is already published. |
-| ["The Non-Determinism of Small LLMs" (arXiv:2509.09705)](https://arxiv.org/html/2509.09705v1) | Repeated MCQ trials on 2B–8B models. | 🟡 Different model-size band. |
-| ["LLM Output Drift: Cross-Provider Validation" (arXiv:2511.07585)](https://arxiv.org/html/2511.07585) | Exactly the "different providers give different answers for the same model" finding. | 🔴 Cross-provider determinism already measured. |
-| ["Measuring Determinism in LLMs for Code Review" (arXiv:2502.20747)](https://arxiv.org/pdf/2502.20747) | Determinism evaluation for code tasks. | 🟡 Domain-specific. |
-
-**Verdict.** As a standalone finding, dead. Keep `self_consistency` *only* as
-the noise floor for whichever pivot you land on — don't try to publish it.
-
----
-
-## 4. Agent failure taxonomies — relevant context, low overlap
-
-| Paper | Claim |
-|---|---|
-| ["Where LLM Agents Fail and How They Can Learn From Failures" (arXiv:2509.25370)](https://arxiv.org/abs/2509.25370) | AgentErrorTaxonomy + AgentErrorBench — annotated failure trajectories on ALFWorld/GAIA/WebShop. |
-| [TRAJECT-Bench (arXiv:2510.04550)](https://arxiv.org/abs/2510.04550v1) | Trajectory-aware benchmark for agentic tool use; identifies "similar tool confusion" and "parameter-blind selection." |
-| [AgenTracer (arXiv:2509.03312)](https://arxiv.org/pdf/2509.03312) | Failure localization in multi-agent systems. |
-
-These are about *tool-using* agent failure, not multi-turn conversational
-pathologies. Useful related-work neighbors, not direct competitors.
-
----
-
-## What's still novel — your pivot options
-
-The original framing is too crowded. Here are the angles where I see a real
-gap, ranked by what I'd bet on as a paper:
-
-### Pivot A — Reasoning vs non-reasoning split (RECOMMENDED)
-**Run the testbed you've already built on reasoning *and* non-reasoning
-siblings of the same family**: `deepseek-v4-pro` vs `deepseek-r1-0528`
-*(exploratory — these two differ in base architecture/scale; the headline
-rests on the Qwen pairs)*, `qwen3-235b-a22b-2507` vs
-`qwen3-235b-a22b-thinking-2507`, `qwen3-30b-a3b-instruct-2507` vs
-`qwen3-30b-a3b-thinking-2507`, with `anthropic/claude-opus-4.7` as anchor.
-
-**Hypothesis.** Reasoning-trained models trade off pathology-resistance
-differently than instruct-trained siblings. Either (a) reasoning models are
-more robust because they re-derive answers, or (b) they are *less* robust
-because they over-explain themselves into sycophantic reversals. Either
-direction is publishable if the paper stays framed as a paired multi-axis
-profile rather than a standalone sycophancy benchmark.
-
-**Why this works:** the broad multi-axis, paired, no-LLM-judge comparison is
-still a useful gap. However, sycophancy alone is no longer enough, because
-SYCON already includes a reasoning-vs-instruction-tuned result. The strongest
-claim is the combined trajectory-pathology profile across context rot,
-sycophancy, and deterministic replay noise.
-
-**Risk:** medium — the paper must not sell "reasoning vs instruct
-sycophancy" as the main novelty. The novelty is the controlled, paired,
-multi-axis pathology profile.
-
-### Pivot B — Mechanistic interpretability on one phenomenon
-Pick one (probably context rot), load Qwen3-32B locally via `transformers`,
-and probe attention from the probe token back to the plant token across the
-filler-count sweep. **Identify the attention pattern that decays in lockstep
-with accuracy.** Bonus: causal intervention — patch the attention activations
-back to their turn-0 values and see if accuracy recovers.
-
-**Why this works:** none of the multi-turn-degradation papers in this list
-do interpretability. This is the move from "we measured a thing" to "we
-found the circuit responsible." Top-venue paper if the result is clean.
-
-**Risk:** higher — open-ended ML research, may not pan out. Time budget:
-3–4 weeks of GPU work after the behavioral curves are in.
-
-### Pivot C — First systematic evaluation on Chinese open-weight stack
-Frame as a measurement paper: replicate SYCON / SycEval / "LLMs Get Lost"
-methodology on a model set nobody has run cleanly (Qwen 3.5, DeepSeek V4,
-GLM 4.7, Kimi K2.6, MiniMax M2.7). Add reasoning-model coverage. Add
-size-scaling rows.
-
-**Why this works:** "first systematic eval on X" is a legitimate paper
-shape, and the eval-on-Chinese-models gap is real. Workshop / regional
-venue acceptance odds are high.
-
-**Risk:** medium — reviewers may call it derivative. Compensate with breadth
-and an open-source dashboard contribution.
-
-### Pivot D — Drop sycophancy, focus on one novel axis of context rot
-Examples: cross-turn fact contamination (does an injected wrong fact early
-in a long conversation propagate into unrelated later answers?), or
-adversarial filler (filler turns specifically designed to compete with
-the planted fact for attention). The basic curve is published — but
-specific perturbation typologies aren't.
-
-**Risk:** medium — needs you to identify the specific perturbation
-nobody has tried.
+**How this study relates.** Our context-rot axis adopts the
+single-task, controlled-filler protocol — a 20-update variable-tracking
+task probed after $k \in \{0, 2, 5, 10, 20, 40\}$ filler turn-pairs of
+four kinds (irrelevant, topically related, token-matched,
+collapsed-same-token-mass). We do not attempt to compete with Laban et
+al. at panel scale; we instead trade breadth for the within-pair
+reasoning-mode contrast they cannot deliver. Specifically, we identify
+that the DeepSeek instruct siblings already saturate this task at
+~$1.000$ accuracy across every filler depth — a ceiling effect that
+suppresses any within-pair reasoning effect by construction. Reporting
+this null honestly is itself a contribution, because the prior
+literature's panel-average effect can be interpreted as a uniform
+property of multi-turn LLM behavior when it is in fact a property of
+the weakest models on the panel.
 
 ---
 
-## Decision: Pivot A locked (2026-05-13)
+## 2. Sycophancy
 
-After the lit pass, **Pivot A is committed** as the paper direction. The
-testbed remains the same; the comparison axis is now within-family instruct
-vs reasoning. Full hypotheses, analysis plan, and stopping rules are in
-`PREREGISTRATION.md`.
+**Hong et al., *Measuring Sycophancy in Multi-turn Dialogues* / SYCON
+Bench ([arXiv:2505.23840](https://arxiv.org/abs/2505.23840), EMNLP
+2025)** is the closest existing work to our sycophancy axis. SYCON
+introduces *Turn of Flip (ToF)* and *Number of Flip (NoF)* as
+metrics, reports that reasoning-optimized models in their panel
+resist sycophancy better than instruction-tuned ones, and frames the
+contrast at the cross-family level. **Fanous et al., *SycEval*
+([arXiv:2502.08177](https://arxiv.org/html/2502.08177v4))** reports
+that once a model yields to an incorrect user assertion the
+agreement-seeking behavior often persists across subsequent turns —
+the same observation we operationalize as the post-pushback gap sweep.
+*Sycophancy under Pressure*
+([arXiv:2508.13743](https://arxiv.org/html/2508.13743v1)) studies
+adversarial dialogues in scientific QA. *Sycophancy Is Not One Thing*
+([arXiv:2509.21305](https://arxiv.org/html/2509.21305v1)) decomposes
+sycophantic behavior causally. *Beacon*
+([arXiv:2510.16727](https://arxiv.org/html/2510.16727)) attempts
+single-turn diagnosis of latent sycophantic tendencies, distinct from
+the multi-turn pushback setup. *SycoEval-EM*
+([arXiv:2601.16529](https://arxiv.org/html/2601.16529)) reports
+DeepSeek-Chat acquiescence rates near 48% on clinical encounter
+benchmarks. *The Fragility of Moral Judgment*
+([arXiv:2603.05651](https://arxiv.org/html/2603.05651)) evaluates
+DeepSeek-V3 and Qwen2.5 on moral-reasoning sycophancy perturbations.
 
-The remaining pivots (B mechanistic, C systematic-eval-on-Chinese-stack,
-D novel-perturbation) stay on the shelf as follow-up papers if a strong
-effect appears in A.
+**How this study relates.** SYCON's headline finding — that
+reasoning-optimized variants resist sycophancy better — is the
+closest direct prediction in the prior literature for our sycophancy
+axis. We adopt the wrong / correct / neutral pushback design and the
+post-pushback gap sweep, scoring on integer-extracted answers without
+an LLM judge. The contribution is methodological: SYCON aggregates
+across a heterogeneous panel where the reasoning effect is confounded
+with model family, scale, and serving stack. Our within-MODEL pairs
+(DeepSeek V4-pro toggled between reasoning on and off; V4-flash
+toggled via its legacy aliases) isolate the reasoning-mode contrast
+on identical base weights. The empirical result is more
+heterogeneous than SYCON's panel-average suggests: we find a clean
+within-MODEL effect on V4-flash, a null at the preregistered
+threshold on V4-pro, and large but capability-confounded effects on
+the Qwen cross-SKU pairs. The right read of our paper alongside
+SYCON's is that the panel-average direction holds in expectation but
+the within-pair effect is not uniform across reasoning-enabled
+variants, which is a practitioner-relevant refinement.
 
-## Why Pivot A
+---
 
-**Pick Pivot A (reasoning vs non-reasoning).** Reasons:
-1. Reuses the testbed you've already built — zero engineering rework.
-2. The model pairs exist on OpenRouter today (DeepSeek V4 vs R1, Qwen
-   instruct vs thinking).
-3. Whatever the result, it's publishable if framed as a multi-axis pathology
-   profile, not as a standalone sycophancy benchmark.
-4. If a striking effect shows up on one phenomenon, you have a natural
-   path into Pivot B (mechanistic) on that phenomenon.
+## 3. Inference non-determinism ("self-consistency drift")
 
-If you commit to Pivot A, the updated paper outline becomes:
-> *Do reasoning-tuned LLMs exhibit different trajectory pathologies than
-> their instruct-tuned siblings? A controlled study across the Qwen, DeepSeek,
-> and Anthropic model families.*
+**Atil et al., *Non-Determinism of "Deterministic" LLM Settings*
+([arXiv:2408.04667](https://arxiv.org/abs/2408.04667))** measures up
+to 15% accuracy variance and up to 70% best-to-worst spread across
+ten runs of five LLMs on eight tasks, even with deterministic
+sampling configuration. **He et al., *Understanding and Mitigating
+Numerical Sources of Nondeterminism in LLM Inference*
+([arXiv:2506.09501](https://arxiv.org/pdf/2506.09501))** provides the
+mechanistic explanation — tiny logit gaps amplified by BF16/FP16
+numerical noise — and shows that FP32 inference recovers near-determinism.
+*The Non-Determinism of Small LLMs*
+([arXiv:2509.09705](https://arxiv.org/html/2509.09705v1)) reports
+repeated-trial variance specifically in the 2B–8B parameter band.
+*LLM Output Drift: Cross-Provider Validation*
+([arXiv:2511.07585](https://arxiv.org/html/2511.07585)) measures the
+cross-provider variance for the same nominal model. *Measuring
+Determinism in LLMs for Code Review*
+([arXiv:2502.20747](https://arxiv.org/pdf/2502.20747)) evaluates
+determinism on code tasks.
 
-The three experiments (`self_consistency`, `context_rot`, `sycophancy`)
-become the three measurement axes within that paper. The story stays
-cohesive. The novelty is the within-family comparison.
+**How this study relates.** As a standalone phenomenon, inference
+non-determinism is comprehensively measured by the works above; we
+make no novel claim about the measurement. We re-use the protocol —
+identical replays at $T=0$ scored by integer extraction — as a noise
+floor against which the within-pair reasoning effect must register.
+The substantive finding on our axis is that the reasoning siblings
+drive integer-extracted answer divergence to near zero on the
+DeepSeek pairs (from $0.422$ to $0.010$ on V4-flash; from $0.554$ to
+$0.003$ on V4-pro) while also producing the largest accuracy gains in
+the paper. We frame this as joint evidence that the reasoning mode
+trades off the He et al. numerical-noise sensitivity for a more
+stable conditional answer distribution, not as an independent
+contribution to the determinism literature.
 
-## Source list
+We additionally document one phenomenon the cited works do not: the
+Qwen instruct SKUs mode-collapse on hardness-5 arithmetic to a
+single placeholder integer (most often "1234"), giving low
+divergence with zero accuracy. The accuracy paired test was
+preregistered as a co-primary measure specifically to catch this
+failure mode, which a divergence-only protocol would record as a
+false null. We document this in §6.1 of the paper and use it as the
+empirical motivation for reporting accuracy and divergence
+separately on this axis.
 
-- [LLMs Get Lost In Multi-Turn Conversation](https://arxiv.org/abs/2505.06120)
-- [Drift No More? Context Equilibria in Multi-Turn LLM Interactions](https://arxiv.org/html/2510.07777v1)
-- [Intent Mismatch Causes LLMs to Get Lost in Multi-Turn Conversation](https://arxiv.org/html/2602.07338v1)
-- [Conversation Tree Architecture](https://arxiv.org/html/2603.21278)
-- [SYCON Bench — Measuring Sycophancy in Multi-turn Dialogues](https://arxiv.org/abs/2505.23840)
-- [SycEval](https://arxiv.org/html/2502.08177v4)
-- [Sycophancy under Pressure](https://arxiv.org/html/2508.13743v1)
-- [Sycophancy Is Not One Thing: Causal Separation](https://arxiv.org/html/2509.21305v1)
-- [Beacon — Single-Turn Diagnosis of Latent Sycophancy](https://arxiv.org/html/2510.16727)
-- [SycoEval-EM — clinical sycophancy](https://arxiv.org/html/2601.16529)
-- [The Fragility of Moral Judgment in LLMs](https://arxiv.org/html/2603.05651)
-- [Non-Determinism of "Deterministic" LLM Settings](https://arxiv.org/abs/2408.04667)
-- [Numerical Sources of Nondeterminism in LLM Inference](https://arxiv.org/pdf/2506.09501)
-- [The Non-Determinism of Small LLMs](https://arxiv.org/html/2509.09705v1)
-- [LLM Output Drift: Cross-Provider Validation](https://arxiv.org/html/2511.07585)
-- [NOLIMA — Long-Context Beyond Literal Matching](https://arxiv.org/pdf/2502.05167)
-- [MemoryAgentBench](https://arxiv.org/html/2507.05257v1)
-- [Where LLM Agents Fail and How They Can Learn From Failures](https://arxiv.org/abs/2509.25370)
-- [TRAJECT-Bench](https://arxiv.org/abs/2510.04550v1)
-- [AgenTracer](https://arxiv.org/pdf/2509.03312)
+---
+
+## 4. Agent failure taxonomies
+
+Three recent works characterize agent-failure modes at a higher level
+of abstraction: **Where LLM Agents Fail and How They Can Learn From
+Failures ([arXiv:2509.25370](https://arxiv.org/abs/2509.25370))**
+introduces AgentErrorTaxonomy and AgentErrorBench, annotating failure
+trajectories on ALFWorld, GAIA, and WebShop. **TRAJECT-Bench
+([arXiv:2510.04550](https://arxiv.org/abs/2510.04550v1))** identifies
+"similar tool confusion" and "parameter-blind selection" as recurring
+failure modes in tool-using agents. **AgenTracer
+([arXiv:2509.03312](https://arxiv.org/pdf/2509.03312))** localizes
+failures in multi-agent systems. These taxonomies cover tool-using and
+multi-agent contexts that are out of scope for our pure
+single-LLM, multi-turn-conversation setting, but they place the
+present study in the broader landscape of LLM-as-component reliability
+work.
+
+---
+
+## 5. Reasoning-vs-instruct comparisons as a methodological axis
+
+The closest work to our specific design (within-family, paired,
+controlled) is SYCON's reasoning-vs-instruct sub-analysis on the
+sycophancy axis. SYCON does not extend this contrast across
+self-consistency or context rot, and the underlying pairs are
+cross-family rather than within-MODEL. None of the works in §§1–3
+above isolates the reasoning-mode intervention in a paired design with
+frozen analysis plan across three pathology axes. The contribution of
+the present paper is the controlled multi-axis profile rather than any
+single-axis measurement: combining self-consistency, sycophancy, and
+context rot in one experiment makes it possible to distinguish a
+"reasoning helps everywhere" reading (which the data refutes) from a
+"reasoning helps selectively" reading (which the data supports).
+
+---
+
+## 6. What this paper contributes that the prior work does not
+
+Three claims:
+
+1. **The first within-MODEL reasoning-toggle comparison.** Our DeepSeek
+   pairs hold base weights, scale, and serving host identical across
+   instruct and reasoning siblings; the only varying parameter is the
+   runtime reasoning toggle. The prior literature's reasoning-vs-instruct
+   comparisons (SYCON, SycEval, and most heterogeneous-panel work)
+   compare across families or post-training runs, conflating the
+   intervention with confounders we hold constant.
+
+2. **A multi-axis pathology profile under a single preregistered
+   analysis plan.** Hypotheses, primary metrics, effect-size thresholds
+   (Cohen's $h \geq 0.20$; $|\text{DiD gain}| \geq 0.10$), BH
+   multiple-comparisons correction at FDR$=0.05$, and the six
+   exclusion classes were committed before any real-model data was
+   collected. Every amendment is dated in `PREREGISTRATION.md`. The
+   cross-axis pattern is the headline finding.
+
+3. **Honest accounting of where the within-pair effect is heterogeneous
+   and where it is ceiling-bound.** We report and label V4-pro
+   sycophancy as a within-MODEL null at the preregistered threshold,
+   even though the panel-average direction in SYCON is positive; and
+   we report the DeepSeek context-rot result as a ceiling-bound null
+   rather than a reverse finding. The substantive practitioner
+   takeaway — reasoning enablement is a selective intervention, not a
+   uniform robustness lever — depends on these honest nulls being
+   reported, not hidden.
