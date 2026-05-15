@@ -1,19 +1,56 @@
 # agent-pathologies
 
-A preregistered empirical study of how **reasoning-enabled variants** of
-large language models differ from their **instruct-tuned siblings** on
-three multi-turn pathology axes: self-consistency, sycophancy, and
-context rot. Four within-family pairs (two within-MODEL reasoning
-toggles on DeepSeek V4-pro and V4-flash, two cross-SKU pairs on Qwen3
-families) are tested under matched paired sweeps with frozen hypotheses,
-analysis plan, exclusion classes, and effect-size thresholds.
+**Paper:** [`paper/main.pdf`](paper/main.pdf)
 
-The paper draft, figures, preregistration log, and per-trajectory data
-all live in this repository. The full preprint is in
-[`paper/`](paper/); the reproducibility pointers are at the bottom of
-this README.
+This is a preregistered study of a simple question:
+
+> When an AI model is given a "reasoning mode," does it actually become
+> more reliable, or does reasoning only help with some kinds of failures?
+
+I compare reasoning-enabled models against their non-reasoning /
+instruct versions on three failure modes: whether they give consistent
+answers, whether they cave when the user pushes a wrong answer, and
+whether they lose track of information as conversations get longer.
+
+The short version: **reasoning helps a lot with hard problem-solving,
+but it does not magically fix every multi-turn failure.** It is a
+selective tool, not a universal upgrade.
+
+The paper draft, figures, preregistration log, and analysis code live in
+this repository. The full per-trajectory result logs are excluded from
+GitHub due to size and will be shared through a release archive.
 
 ---
+
+## Plain-English summary
+
+Most people assume that if a model has a reasoning mode, it should just
+be "smarter" and therefore more reliable. This project tests whether
+that is actually true.
+
+I tested four model pairs. In each pair, one model is the normal
+instruct version and the other is the reasoning-enabled version. Then I
+checked three things:
+
+1. **Does it stay consistent?** If I ask the same hard question many
+   times, does the model keep giving the same correct answer?
+2. **Does it get pressured by the user?** If the model gives an answer
+   and the user confidently says the wrong answer is correct, does the
+   model cave?
+3. **Does it lose track in long conversations?** If I give the model a
+   task, add lots of filler conversation, and then ask about the task at
+   the end, does it still remember what matters?
+
+The main result is not "reasoning models are always better." The result
+is more specific:
+
+> Reasoning strongly helps when the model needs to solve a hard problem,
+> but it only selectively helps with multi-turn reliability. Different
+> failure modes behave differently.
+
+That matters because people are starting to use reasoning models as if
+they are automatically safer or more robust. This study argues that they
+still need to be tested by failure type.
 
 ## Research question
 
