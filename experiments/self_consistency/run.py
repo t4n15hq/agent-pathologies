@@ -14,7 +14,17 @@ from agent_pathologies.tasks import get_task
 
 
 async def main(args: argparse.Namespace) -> None:
+    if args.or_key_env and args.or_key_env != "OPENROUTER_API_KEY":
+        import os
+        alt = os.environ.get(args.or_key_env)
+        if not alt:
+            raise SystemExit(f"env var {args.or_key_env} is empty or missing")
+        os.environ["OPENROUTER_API_KEY"] = alt
+        print(f"using OpenRouter key from ${args.or_key_env}")
     cfg = load_yaml(Path(args.config))["self_consistency"]
+    if args.max_tokens is not None:
+        cfg["max_tokens"] = args.max_tokens
+        print(f"max_tokens override: {args.max_tokens}")
     if args.mock:
         specs = mock_run_specs()
     else:
@@ -50,7 +60,8 @@ async def main(args: argparse.Namespace) -> None:
             request_seed = task_seed
             for repeat in range(cfg["n_repeats"]):
                 total_planned += 1
-                key = cell_key(spec.model, inst.task_id, repeat, request_seed)
+                key = cell_key(spec.model, inst.task_id, repeat, request_seed,
+                               model_role=spec.role)
                 if key in done:
                     skipped += 1
                     continue
@@ -84,6 +95,10 @@ async def main(args: argparse.Namespace) -> None:
     if not coros:
         print("nothing to run")
         return
+    # Shuffle so providers (DeepSeek direct + OpenRouter) are hit
+    # concurrently instead of one-spec-at-a-time. Fixed seed for reproducibility.
+    import random as _r
+    _r.Random(0).shuffle(coros)
     results = await run_batch(coros, concurrency=args.concurrency)
     cost = sum((t.cost_usd or 0.0) for t in results)
     print(f"completed {len(results)} trajectories; this-session cost ≈ ${cost:.4f}")
@@ -101,4 +116,10 @@ if __name__ == "__main__":
     p.add_argument("--anchors", choices=["include", "skip", "only"], default="include",
                    help="include = pairs + anchors (default); skip = pairs only (stage 1); "
                         "only = anchors only (stage 2 — leverages resumability)")
+    p.add_argument("--or-key-env", default="OPENROUTER_API_KEY",
+                   help="Name of env var holding the OpenRouter key; override "
+                        "for parallel sweeps with separate accounts/keys.")
+    p.add_argument("--max-tokens", type=int, default=None,
+                   help="Override max_tokens from config. Useful for retrying "
+                        "cells excluded as truncated_at_max_tokens.")
     asyncio.run(main(p.parse_args()))

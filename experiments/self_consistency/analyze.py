@@ -13,6 +13,7 @@ from agent_pathologies.analysis.metrics import (
     answer_divergence,
     exclusion_report,
     exploratory_families,
+    extracted_divergence,
     filter_analyzable,
     load_jsonl,
     tag_exploratory,
@@ -35,16 +36,25 @@ def main(args: argparse.Namespace) -> None:
         print("\n(no analyzable rows remain after exclusions — analyzer cannot proceed)")
         return
 
-    # Per-task divergence per (family, role)
+    # Per-task divergence per (family, role).
+    # Primary divergence metric is on the EXTRACTED integer answer (what the
+    # task actually scores). String-form divergence is also reported for
+    # comparison — the analysis pass on stage-1 data found that string
+    # divergence overstated the deepseek-v4-flash effect by ~2x because
+    # chain-of-thought text varies in length even when the final integer
+    # matches. See PREREGISTRATION amendment dated 2026-05-14.
     rows = []
     for (family, role, task_id), grp in df.groupby(["model_family", "model_role", "task_id"]):
         if len(grp) < 3:
             continue
-        d = answer_divergence(grp["probe_answer"].tolist())
+        d_str = answer_divergence(grp["probe_answer"].tolist())
+        d_int = extracted_divergence(grp["probe_answer"].tolist())
         acc = grp["is_correct"].mean()
         rows.append({
             "family": family, "role": role, "task_id": task_id,
-            "divergence": d, "accuracy": acc, "n": len(grp),
+            "divergence": d_int,            # primary: extracted integer
+            "divergence_string": d_str,     # legacy/reference: raw string
+            "accuracy": acc, "n": len(grp),
         })
     per_task = pd.DataFrame(rows)
     if per_task.empty:
@@ -52,12 +62,20 @@ def main(args: argparse.Namespace) -> None:
         return
 
     print()
-    print("=== mean divergence per family x role ===")
+    print("=== mean (integer) divergence per family x role ===")
     summary = (
         per_task.groupby(["family", "role"])["divergence"]
         .agg(["mean", "std", "count"]).reset_index()
     )
     print(summary.to_string(index=False))
+
+    print()
+    print("=== mean accuracy per family x role ===")
+    acc_summary = (
+        per_task.groupby(["family", "role"])["accuracy"]
+        .agg(["mean", "std", "count"]).reset_index()
+    )
+    print(acc_summary.to_string(index=False))
 
     # Paired Wilcoxon per family
     print()
@@ -70,42 +88,57 @@ def main(args: argparse.Namespace) -> None:
         print("(no within-family pairs available — need both instruct and reasoning rows)")
         return
 
-    paired_rows = []
-    for family in families:
-        sub = per_task[per_task["family"] == family]
-        instr = sub[sub["role"] == "instruct"].set_index("task_id")["divergence"]
-        reas = sub[sub["role"] == "reasoning"].set_index("task_id")["divergence"]
-        common = instr.index.intersection(reas.index)
-        if len(common) < 5:
-            continue
-        a, b = instr.loc[common].values, reas.loc[common].values
-        # Skip if all differences are zero (no variability)
-        if (a - b == 0).all():
-            stat, p = float("nan"), 1.0
-        else:
-            res = wilcoxon(a, b, zero_method="wilcox", alternative="two-sided")
-            stat, p = float(res.statistic), float(res.pvalue)
-        ci_lo_diff, ci_hi_diff = bootstrap_ci((a - b).tolist(), n_iters=args.bootstrap_iters)
-        paired_rows.append({
-            "family": family,
-            "n_paired": int(len(common)),
-            "div_instruct": float(a.mean()),
-            "div_reasoning": float(b.mean()),
-            "delta_mean": float((a - b).mean()),
-            "delta_ci_lo": ci_lo_diff,
-            "delta_ci_hi": ci_hi_diff,
-            "wilcoxon_p": p,
-        })
+    def _paired_wilcoxon(metric_col: str):
+        rs = []
+        for family in families:
+            sub = per_task[per_task["family"] == family]
+            instr = sub[sub["role"] == "instruct"].set_index("task_id")[metric_col]
+            reas = sub[sub["role"] == "reasoning"].set_index("task_id")[metric_col]
+            common = instr.index.intersection(reas.index)
+            if len(common) < 5:
+                continue
+            a, b = instr.loc[common].values, reas.loc[common].values
+            if (a - b == 0).all():
+                p = 1.0
+            else:
+                p = float(wilcoxon(a, b, zero_method="wilcox",
+                                   alternative="two-sided").pvalue)
+            ci_lo, ci_hi = bootstrap_ci((a - b).tolist(),
+                                        n_iters=args.bootstrap_iters)
+            rs.append({
+                "family": family, "metric": metric_col,
+                "n_paired": int(len(common)),
+                "instr_mean": float(a.mean()),
+                "reas_mean": float(b.mean()),
+                "delta_mean": float((a - b).mean()),
+                "delta_ci_lo": ci_lo, "delta_ci_hi": ci_hi,
+                "wilcoxon_p": p,
+            })
+        return rs
+
+    # Co-primary tests (PREREGISTRATION amendment 2026-05-14): both
+    # divergence and accuracy are tested with paired Wilcoxon. Accuracy
+    # catches the Qwen mode-collapse pattern (consistently wrong same answer)
+    # that pure divergence misses.
+    paired_rows = _paired_wilcoxon("divergence") + _paired_wilcoxon("accuracy")
 
     if not paired_rows:
         print("(no families with ≥5 paired tasks)")
         return
 
-    q = benjamini_hochberg([r["wilcoxon_p"] for r in paired_rows])
-    for r, qv in zip(paired_rows, q):
-        r["q_value_bh"] = qv
+    # BH-correct within each metric family separately.
+    div_rows = [r for r in paired_rows if r["metric"] == "divergence"]
+    acc_rows = [r for r in paired_rows if r["metric"] == "accuracy"]
+    if div_rows:
+        qs = benjamini_hochberg([r["wilcoxon_p"] for r in div_rows])
+        for r, q in zip(div_rows, qs):
+            r["q_value_bh"] = q
+    if acc_rows:
+        qs = benjamini_hochberg([r["wilcoxon_p"] for r in acc_rows])
+        for r, q in zip(acc_rows, qs):
+            r["q_value_bh"] = q
 
-    out_df = pd.DataFrame(paired_rows)
+    out_df = pd.DataFrame(div_rows + acc_rows)
     explor = exploratory_families(df_all)
     if explor:
         out_df["family"] = out_df["family"].apply(

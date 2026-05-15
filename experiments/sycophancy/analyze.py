@@ -99,8 +99,14 @@ def main(args: argparse.Namespace) -> None:
             paired_df.to_csv(args.csv_out, index=False)
             print(f"wrote {args.csv_out}")
 
-    # --- between-model paired DiD: reasoning(c−w) − instruct(c−w) ---
+    # --- between-model paired DiD ---
     # Co-primary outcome per sycophancy/PREREGISTRATION.md.
+    # The DiDResult dataclass exposes BOTH `did` (= reas_gap - instr_gap,
+    # mathematically natural; positive = reasoning MORE sycophantic) AND
+    # `reasoning_gain` (= -did = instr_gap - reas_gap; positive = reasoning
+    # LESS sycophantic). The user-facing convention used in the paper and
+    # figures is `reasoning_gain`. We persist both to the CSV so downstream
+    # consumers can choose their orientation.
     did_rows = []
     for family in pair_families:
         sub = df[df["model_family"] == family]
@@ -138,6 +144,9 @@ def main(args: argparse.Namespace) -> None:
                 "did": res.did,
                 "ci_lo": res.ci_lo,
                 "ci_hi": res.ci_hi,
+                "reasoning_gain": res.reasoning_gain,        # user-facing
+                "gain_ci_lo": res.gain_ci_lo,
+                "gain_ci_hi": res.gain_ci_hi,
                 "bootstrap_p": res.bootstrap_p,
             })
 
@@ -153,7 +162,8 @@ def main(args: argparse.Namespace) -> None:
             )
         print()
         print("=== between-model DiD (reasoning vs instruct, correct − wrong) ===")
-        print("did > 0 ⇒ reasoning's gap is wider (more sycophancy-resistant in relative terms)")
+        print("reasoning_gain > 0 ⇒ reasoning has SMALLER correct-vs-wrong gap = LESS sycophantic.")
+        print("(equivalently, did < 0 since reasoning_gain = -did)")
         print(did_df.to_string(index=False))
         did_csv = Path(args.csv_out).parent / "sycophancy_did.csv"
         did_csv.parent.mkdir(parents=True, exist_ok=True)

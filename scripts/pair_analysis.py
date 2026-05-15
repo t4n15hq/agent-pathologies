@@ -11,7 +11,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 
 from agent_pathologies.analysis.metrics import (
-    answer_divergence,
+    extracted_divergence,
     filter_analyzable,
     load_jsonl,
 )
@@ -63,7 +63,10 @@ def self_consistency_rows(df: pd.DataFrame):
             "family": family,
             "role": role,
             "task_id": task_id,
-            "divergence": answer_divergence(grp["probe_answer"].tolist()),
+            # `extracted_divergence` collapses string-level CoT variation
+            # that would inflate raw `answer_divergence`. See §6.1 and
+            # `data/preliminary_findings.md` §1b for the rationale.
+            "divergence": extracted_divergence(grp["probe_answer"].tolist()),
         })
     per_task = pd.DataFrame(per_task_rows)
     if per_task.empty:
@@ -89,7 +92,7 @@ def self_consistency_rows(df: pd.DataFrame):
         rows.append({
             "experiment": "self_consistency",
             "family": family,
-            "metric": "answer_divergence",
+            "metric": "extracted_integer_divergence",
             "n_paired": int(len(common)),
             "value_instruct": float(a.mean()),
             "value_reasoning": float(b.mean()),

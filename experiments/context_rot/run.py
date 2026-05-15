@@ -24,7 +24,19 @@ from agent_pathologies.types import Role, Turn
 
 
 async def main(args: argparse.Namespace) -> None:
+    # Allow per-process OpenRouter key swap so two parallel sweep processes
+    # can use separate keys (avoiding per-account rate limits).
+    if args.or_key_env and args.or_key_env != "OPENROUTER_API_KEY":
+        import os
+        alt = os.environ.get(args.or_key_env)
+        if not alt:
+            raise SystemExit(f"env var {args.or_key_env} is empty or missing")
+        os.environ["OPENROUTER_API_KEY"] = alt
+        print(f"using OpenRouter key from ${args.or_key_env}")
     cfg = load_yaml(Path(args.config))["context_rot"]
+    if args.max_tokens is not None:
+        cfg["max_tokens"] = args.max_tokens
+        print(f"max_tokens override: {args.max_tokens}")
     if args.mock:
         specs = mock_run_specs()
     else:
@@ -65,7 +77,8 @@ async def main(args: argparse.Namespace) -> None:
                     sweep_value = {"n_filler": k, "kind": kind}
                     seed = rng_seed_base + k * 10 + filler_kinds.index(kind)
                     total_planned += 1
-                    key = cell_key(spec.model, inst.task_id, sweep_value, seed)
+                    key = cell_key(spec.model, inst.task_id, sweep_value, seed,
+                                   model_role=spec.role)
                     if key in done:
                         skipped += 1
                         continue
@@ -104,6 +117,8 @@ async def main(args: argparse.Namespace) -> None:
     print(f"planned={total_planned}  skipped={skipped}  to_run={len(coros)}")
     if not coros:
         return
+    import random as _r
+    _r.Random(0).shuffle(coros)  # interleave providers; same seed for reproducibility
     results = await run_batch(coros, concurrency=args.concurrency)
     cost = sum((t.cost_usd or 0.0) for t in results)
     print(f"completed {len(results)} trajectories; this-session cost ≈ ${cost:.4f}")
@@ -120,4 +135,12 @@ if __name__ == "__main__":
     p.add_argument("--anchors", choices=["include", "skip", "only"], default="include",
                    help="include = pairs + anchors; skip = pairs only (stage 1); "
                         "only = anchors only (stage 2)")
+    p.add_argument("--or-key-env", default="OPENROUTER_API_KEY",
+                   help="Name of env var holding the OpenRouter key for this "
+                        "process. Defaults to OPENROUTER_API_KEY; use a "
+                        "second-key env var (e.g. OPENROUTER_API_KEY_2) when "
+                        "running parallel sweeps under separate accounts/keys.")
+    p.add_argument("--max-tokens", type=int, default=None,
+                   help="Override max_tokens from config. Used by "
+                        "scripts/retry_truncated.py for higher-token retries.")
     asyncio.run(main(p.parse_args()))

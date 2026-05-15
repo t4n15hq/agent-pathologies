@@ -34,14 +34,14 @@ done
 run_one () {
     local exp="$1"
     echo "=== $exp ==="
-    $PY "experiments/${exp}/run.py" $MOCK_FLAG "${ANCHORS_FLAG[@]}" --concurrency 8
+    $PY "experiments/${exp}/run.py" $MOCK_FLAG "${ANCHORS_FLAG[@]}" --concurrency 16
     $PY "experiments/${exp}/analyze.py"
     echo
 }
 
 run_one self_consistency
-run_one context_rot
 run_one sycophancy
+run_one context_rot
 
 echo "All sweeps done."
 echo "Cross-experiment summary:"
