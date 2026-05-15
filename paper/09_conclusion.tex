@@ -1,0 +1,36 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We tested whether reasoning-enabled variants of Chinese open-weight
+LLMs differ from their instruct-tuned siblings on three multi-turn
+pathology axes, using a preregistered within-family paired design
+across four pairs (DeepSeek V4-pro, V4-flash, Qwen3-235B, Qwen3-30B).
+On hardness-5 arithmetic self-consistency the reasoning variant
+outperforms the instruct sibling on every per-task comparison in every
+family (sign-test BH-$q < 10^{-11}$; pooled $\Delta_{\mathrm{acc}}$ of
+$+0.674$ to $+0.985$), and on the DeepSeek pairs reasoning also drives
+integer-extracted answer divergence to effectively zero (from $0.422$
+and $0.554$ to $0.010$ and $0.003$). On sycophancy the within-MODEL
+pairs split: V4-flash shows a clean reasoning advantage
+($\mathrm{gain}{=}+0.165$, BH-$q\approx 5{\times}10^{-4}$), V4-pro is
+null at the preregistered $|\mathrm{gain}|\geq 0.10$ threshold
+($+0.045$, $\mathrm{CI}\,[-0.06, +0.15]$); the Qwen pairs show much
+larger gains that are partially confounded with capability gaps from
+the instruct mode-collapse documented in
+\S\ref{sec:discussion:capability}. Context rot is dominated by ceiling
+effects on the DeepSeek pairs ($\Delta_{\mathrm{acc}}\approx 0$ at
+n\_filler${=}40$ across all four filler kinds) and shows a positive
+reasoning effect on Qwen ($+0.16$ to $+0.46$) that we again read
+through the capability-confound lens.
+
+For practitioners, the practical implication is that reasoning
+enablement is best understood as a \emph{selective} intervention. It
+reliably and substantially helps on hard single-shot reasoning; it
+helps on sycophancy resistance but heterogeneously across models in
+the same family; and it does not necessarily help on multi-turn
+state-tracking once the instruct baseline is already strong. The
+cross-axis pattern is itself the finding: ``reasoning makes pathology
+resistance better everywhere'' is too coarse a claim. A more useful
+heuristic is that reasoning enablement amplifies the inference
+component of a task and is therefore most useful precisely where the
+instruct sibling lacks inference headroom.

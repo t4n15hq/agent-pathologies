@@ -34,18 +34,34 @@ these after looking at the data.**
 
 ## Model pairs under test
 
-Defined in `configs/models.yaml`:
+Defined in `configs/models.yaml`. **Within-MODEL reasoning toggle**
+(DeepSeek; the strongest controlled contrast) and **within-FAMILY
+SKU** (Qwen; matched scale, different post-training):
 
-| Family | Instruct | Reasoning |
-|---|---|---|
-| deepseek-v *(exploratory — see below)* | `deepseek/deepseek-v4-pro` | `deepseek/deepseek-r1-0528` |
-| qwen3-235b | `qwen/qwen3-235b-a22b-2507` | `qwen/qwen3-235b-a22b-thinking-2507` |
-| qwen3-30b | `qwen/qwen3-30b-a3b-instruct-2507` | `qwen/qwen3-30b-a3b-thinking-2507` |
+| Family | Instruct | Reasoning | Pair design |
+|---|---|---|---|
+| `deepseek-v4-pro`   | `deepseek-v4-pro` (`reasoning: enabled=false`) | `deepseek-v4-pro` (`reasoning: effort=high`) | within-MODEL toggle |
+| `deepseek-v4-flash` | `deepseek-chat` (legacy alias)                 | `deepseek-reasoner` (legacy alias)            | within-MODEL toggle |
+| `qwen3-235b`        | `qwen/qwen3-235b-a22b-2507`                    | `qwen/qwen3-235b-a22b-thinking-2507`          | within-FAMILY SKU   |
+| `qwen3-30b`         | `qwen/qwen3-30b-a3b-instruct-2507`             | `qwen/qwen3-30b-a3b-thinking-2507`            | within-FAMILY SKU   |
 
-The **DeepSeek pair is reported as exploratory**: `v4-pro` and `r1-0528`
-differ in base architecture and active-parameter count, so the
-"post-training is the only varying factor" premise isn't strictly met.
-The headline rests on the Qwen pairs. See `PREREGISTRATION.md §2`.
+DeepSeek pairs hold base weights, scale, and serving host fixed across
+siblings; the only varying parameter is the reasoning toggle. Qwen
+pairs match scale only, and the instruct and thinking SKUs default to
+different OR upstream hosts (a soft caveat carried through the paper).
+The DeepSeek pairs are the load-bearing evidence; the Qwen pairs
+corroborate the direction with the capability-mode-collapse caveat
+discussed in `paper/07_discussion.tex`.
+
+**V4-pro routing amendment (2026-05-15):** the original sweep pinned
+V4-pro to OpenRouter/Novita; per the dated amendment, cells that
+returned `provider_error` or empty content on OR were re-attempted
+through the DeepSeek first-party API with the V4-family-native
+`thinking: {type: ...}` parameter. The analyzable dataset is therefore
+mixed: OR/Novita originals where they succeeded plus DS-direct
+recoveries on the cells where they did not. See
+`PREREGISTRATION.md` amendment log and
+`paper/05_experimental_setup.tex` §5.2 for the full disclosure.
 
 All OpenRouter requests are **pinned to a single upstream host per model**
 (`configs/models.yaml: upstream_provider`, `allow_fallbacks: false`). A
@@ -77,10 +93,12 @@ bash scripts/run_sweep.sh
 python scripts/pair_analysis.py
 ```
 
-Estimated total cost for the full v2 sweep across all paired families +
-Claude anchor: **~$54** (heavily dominated by the Claude anchor; ~$12 without
-it). Reasoning models can spend 3–10x more if they emit long thinking
-traces — budget headroom.
+**Actual sweep cost (Chinese open-weight pairs only, no Claude anchor):
+~$170 USD** — OpenRouter ~$155 (Qwen pairs + V4-pro originals + ConnectError
+storm retries), DeepSeek-direct ~$15 (V4-flash + V4-pro DS-direct
+recoveries). The dominant cost is V4-pro and Qwen3-235B Thinking on OR;
+the V4-pro DS-direct recovery pass cost <$5 because of the 75%
+promotional discount + prompt caching.
 
 ## What's rigorous about this
 
@@ -177,14 +195,48 @@ deterministic given the data; randomness in bootstrap CIs is seeded.
 
 | Component | Status |
 |---|---|
-| Pre-registration locked | done |
-| Multi-provider client | done |
-| Tasks (arithmetic, needle, multi-fact-needle, closed-QA) | done |
+| Pre-registration locked + amendment log | done |
+| Multi-provider client (OpenRouter, DeepSeek-direct, Anthropic, ...) | done |
+| Tasks (arithmetic, variable-tracking, counterintuitive-math, ...) | done |
 | Control conditions (filler kinds + pushback conditions) | done |
 | Resumable runner + token/cost tracking | done |
-| Paired statistical analysis (McNemar, Wilcoxon, BH) | done |
+| Paired statistical analysis (McNemar, Wilcoxon, paired DiD, bootstrap, BH) | done |
+| Semantic dedup pipeline (`metrics.dedupe_to_latest`) | done |
 | Per-experiment pre-registrations | done |
-| Unit tests (51) | done |
-| Mock-provider smoke test (12,500 trajectories) | done |
-| Real-model sweep | awaiting OPENROUTER_API_KEY |
+| Unit tests (63) | done |
+| **Real-model sweep collected** (~22,400 analyzable trajectories) | **done** |
+| **Paper draft** (10 sections, 7 figures, full results) | **done** |
+
+### Final coverage
+
+After the 2026-05-15 amendments (cell-key fix, `max_tokens` recovery,
+V4-pro routing via DeepSeek-direct, Qwen `truncated_at_max_tokens` retry,
+semantic dedup), every (family × role × axis) cell is fully analyzable
+at its preregistered $N$:
+
+- Self-consistency: 8,000 / 8,000 (100%)
+- Sycophancy: 4,800 / 4,800 (100%)
+- Context-rot: 9,600 / 9,600 (100%)
+
+Total project cost: ~$170 USD (OpenRouter ~$155, DeepSeek-direct ~$15).
+See `PREREGISTRATION.md` for the full amendment log and
+`data/preliminary_findings.md` for the post-retry confirmed findings
+(F-01: reasoning massively improves single-shot reliability;
+F-02: the empty-response phenomenon was a config error, not a model
+signal).
+
+### Headline results
+
+| Axis | Direction | Magnitude |
+|---|---|---|
+| Self-consistency (accuracy) | reasoning >> instruct, ALL 4 families | $\Delta_{\mathrm{acc}}$ +0.67 to +0.99, BH-$q$ < $10^{-11}$ everywhere |
+| Sycophancy (reasoning-gain) | heterogeneous within reasoning-enabled variants | V4-flash +0.165 (PASS), V4-pro +0.045 (null at $\geq 0.10$), Qwen pairs +0.85 (capability-confounded) |
+| Context-rot (accuracy) | ceiling-dominated on DeepSeek, positive on Qwen | DeepSeek $\Delta \approx 0$ (instruct at 1.000), Qwen-30B +0.46 (capability-confounded) |
+
+We interpret this as: **reasoning enablement is a selective
+intervention** — it amplifies the inference component of a task, so it
+helps reliably wherever the instruct sibling has inference headroom and
+confers no measurable additional benefit when the instruct sibling is
+already at ceiling. See `paper/07_discussion.tex` for the full
+interpretation.
 | Mechanistic interp follow-up (Pivot B) | future paper |

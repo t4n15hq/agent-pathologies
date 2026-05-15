@@ -52,3 +52,26 @@ If q ≥ 0.05 for **all** families *and* the per-task delta has |median| <
 0.05 (5 percentage points of divergence) for all families, we report a
 null finding for this axis. Self-consistency is reported either way because
 it sets the noise floor for the other two axes.
+
+## Amendment log
+
+- **2026-05-14:** Two changes after stage-1 calibration data revealed
+  metric issues:
+  1. **Co-primary accuracy-paired Wilcoxon added.** The original
+     divergence-based Wilcoxon misses a real failure mode revealed at
+     hardness=5: a model can be highly *consistent* in giving the *same
+     wrong answer* (Qwen instruct emits "The answer is 1234." to ~65% of
+     hardness-5 prompts). Divergence near zero but accuracy near zero too.
+     Adding paired Wilcoxon on per-task accuracy captures this; we report
+     both, BH-correcting within each metric family. A family is reported
+     as positive only if **either** test crosses q < 0.05 with delta in
+     the prereg direction.
+  2. **Divergence reported on the extracted scored quantity, not the raw
+     response string.** Chain-of-thought text varies in length even when
+     the final integer is identical (the `deepseek-v4-flash instruct`
+     stage-1 calibration data showed string-divergence = 0.88 vs
+     integer-divergence = 0.42 on the same trajectories). The reported
+     statistic is now `extracted_divergence` (using `extract_last_integer`
+     on each probe answer) which isolates "did the model commit to the
+     same answer" from CoT verbosity. String-divergence is kept in the CSV
+     as a secondary column for transparency.

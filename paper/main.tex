@@ -1,0 +1,69 @@
+\documentclass[11pt]{article}
+
+% ---------- Geometry & typography ----------
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% ---------- Math ----------
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% ---------- Tables and figures ----------
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+
+% ---------- References ----------
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{url}
+
+% ---------- Links ----------
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Verbatim ----------
+\usepackage{verbatim}
+
+% ---------- Convenience macros ----------
+\newcommand{\acc}[1]{\ensuremath{\mathrm{acc}(#1)}}
+\newcommand{\ndid}{\ensuremath{\Delta\mathrm{DiD}}}
+\newcommand{\cohenh}{\ensuremath{h}}
+\newcommand{\NUM}{\textbf{[NUM]}}
+\newcommand{\TODO}[1]{\textbf{[TODO: #1]}}
+
+\title{Reasoning-Enabled Variants as a Selective Pathology Intervention:\\
+A Within-Family Preregistered Study of Instruct vs.\ Reasoning Modes\\
+in Chinese Open-Weight LLMs}
+
+\author{Tanishq Padwal\\
+\small Independent Researcher\\
+\small \texttt{t4n15hq@gmail.com}}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{abstract}
+\end{abstract}
+
+\input{01_introduction}
+\input{02_related_work}
+\input{03_methodology}
+\input{04_hypotheses_and_analysis_plan}
+\input{05_experimental_setup}
+\input{06_results}
+\input{07_discussion}
+\input{08_limitations}
+\input{09_conclusion}
+\input{10_reproducibility}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

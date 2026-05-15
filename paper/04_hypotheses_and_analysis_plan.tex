@@ -1,0 +1,122 @@
+\section{Hypotheses and Locked Analysis Plan}
+\label{sec:hypotheses}
+
+This section is reproduced from \texttt{PREREGISTRATION.md} (root) and
+the per-experiment preregistrations, with the dated amendments folded
+in. All content here was locked before any real-model data was
+collected. The amendment log in the repository records every change to
+this section with a date and reason.
+
+\subsection{Hypothesis pairs}
+
+For each pathology axis and each within-family pair we test a two-sided
+hypothesis pair. Two-sidedness is intentional and strict: we report any
+significant effect in either direction with equal seriousness, and we
+do not claim a preregistered direction anywhere in the analysis plan.
+This was a deliberate methodological choice---the literature contains
+support for both possibilities (reasoning-enabled variants being more
+robust on some axes; extended reasoning traces causing over-thinking
+failures on others), and we elected not to bias the test or the
+reporting in advance.
+
+\begin{itemize}
+  \item \textbf{Self-consistency.} $H_0$: within a family, instruct and
+        reasoning siblings have the same answer-divergence distribution
+        across $25$ replays of the same task at $T{=}0$. $H_1$: the
+        distributions differ.
+  \item \textbf{Context rot.} $H_0$: within a family, instruct and
+        reasoning siblings have the same accuracy on the running
+        variable-tracking task across the
+        $(n_{\mathrm{filler}} \times \mathrm{kind})$ sweep. $H_1$: they
+        differ---reasoning shifts the slope or intercept of the decay
+        curve.
+  \item \textbf{Sycophancy.} $H_0$: within a family, instruct and
+        reasoning siblings have the same accuracy at re-probe after
+        pushback across the $(\mathrm{condition} \times g)$ sweep.
+        $H_1$: they differ.
+\end{itemize}
+
+\subsection{Paired statistical tests}
+
+\paragraph{Self-consistency.} Per-task divergence is computed on the
+\emph{extracted scored quantity} (not the raw response string), following
+the 2026-05-14 amendment that found chain-of-thought verbosity inflated
+string-level divergence well above answer-level divergence on stage-1
+calibration data. The primary test is a paired Wilcoxon signed-rank on
+per-task divergence across the $40$ tasks per family. A co-primary
+paired Wilcoxon on per-task accuracy is added, because at hardness $5$ a
+model can be highly \emph{consistent} while being highly
+\emph{incorrect}---e.g.\ Qwen instruct emitted the same stock string to
+${\sim}65\%$ of hardness-$5$ prompts during calibration. A family is
+reported as positive only if at least one of the two paired Wilcoxon
+tests crosses BH-corrected $q < 0.05$. Because the tests are two-sided,
+the direction of the delta is reported but not used as a pass/fail
+criterion.
+
+\paragraph{Context rot.} Paired McNemar's exact test on
+\texttt{is\_correct} per
+$(\mathrm{family} \times \mathrm{kind} \times n_{\mathrm{filler}})$
+cell, with Cohen's $h$ for the paired-proportion effect size and BH
+correction across all $24$ cells within each family.
+
+\paragraph{Sycophancy.} Two co-primary tests, both required to clear
+their thresholds before a family is called positive.
+(a) Paired McNemar's exact on \texttt{is\_correct} per
+$(\mathrm{family} \times \mathrm{condition} \times g)$ cell, with
+Cohen's $h$ and BH correction. (b) Between-model paired
+difference-in-differences (DiD): for each $(\mathrm{family}, g)$ cell,
+$\ndid = \big[\mathrm{reasoning}(\acc{\mathrm{correct}} -
+\acc{\mathrm{wrong}})\big] - \big[\mathrm{instruct}(\acc{\mathrm{correct}}
+- \acc{\mathrm{wrong}})\big]$, paired by task identity, with bootstrap
+$95\%$ CI from $10{,}000$ resamples
+(\texttt{paired\_did\_bootstrap}). The DiD is the cleaner statistical
+expression of the research question and is reported as the headline
+statistic; the McNemar is retained for cell-wise diagnostics. The
+amendment dated 2026-05-13 promoted the DiD to co-primary.
+
+\subsection{Effect-size thresholds}
+
+Across all axes we require Cohen's $h \geq 0.20$ on paired proportions
+to call a result substantive. For the sycophancy DiD we additionally
+require $|\ndid| \geq 0.10$ on the proportion scale---a $10$ percentage
+point gap in the differential responsiveness to wrong-versus-correct
+pushback between siblings. Below these thresholds, a result is reported
+as a null finding even if $p < 0.05$. Publication of null is fine; we
+report it.
+
+\subsection{Multiple-comparisons correction}
+
+Within each axis, $p$-values are corrected with Benjamini--Hochberg at
+target FDR $= 0.05$. Correction is applied across all pair-by-cell
+tests within an axis but not across axes, because the three axes test
+different operational hypotheses.
+
+\subsection{Sample sizes and stopping}
+
+\begin{itemize}
+  \item Self-consistency: $N = 40$ tasks $\times 25$ replays per model.
+  \item Context rot: $N = 50$ task instances $\times 6$ filler counts
+        $\times 4$ filler kinds $\times 2$ roles $= 2{,}400$
+        trajectories per family.
+  \item Sycophancy: $N = 50$ task instances $\times 3$ pushback
+        conditions $\times 4$ gaps $\times 2$ roles $= 1{,}200$
+        trajectories per family.
+\end{itemize}
+All three are powered to detect $h = 0.25$ at $\alpha = 0.05$ with
+$\geq 80\%$ paired-design power, assuming an intra-pair correlation of
+$0.4$. No optional stopping: the full $N$ is run before any analysis.
+
+\subsection{Falsification criteria}
+
+The headline claim of the paper is that reasoning-enabled variants
+systematically alter multi-turn pathology resistance within a family. The
+preregistration commits us to report a null result---rather than
+post-hoc reframing as a survey---under the following condition: if
+McNemar/Wilcoxon returns BH-corrected $q > 0.05$ for \emph{all} four
+families and $|h| < 0.20$ (and $|\ndid| < 0.10$ for sycophancy) for
+\emph{all} cells, on \emph{all three} axes, then we conclude that
+reasoning enablement does not systematically alter multi-turn pathology
+resistance in these families. We also report axis-level null findings
+even when other axes are positive, rather than burying or downplaying
+them in the discussion. Any post-hoc reframing would itself be an
+amendment, dated, and would require a fresh sweep.

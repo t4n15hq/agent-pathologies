@@ -1,0 +1,209 @@
+\section{Experimental Setup}
+\label{sec:setup}
+
+This section reports the exact model identifiers, hyperparameters,
+sweep dimensions, and exclusion accounting used to generate the
+results.
+
+\subsection{Models and upstream pinning}
+
+Table~\ref{tab:models} lists the four within-family pairs with their
+OpenRouter (or DeepSeek-direct) model identifiers, the pinned upstream
+host, and the routing parameter that distinguishes the instruct member
+from the reasoning member.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l l l l X}
+\toprule
+Family & Role & Model identifier & Upstream & Distinguishing parameter \\
+\midrule
+\multirow{2}{*}{\texttt{deepseek-v4-pro}$^\dagger$}
+  & instruct  & \texttt{deepseek-v4-pro}\,/\,\texttt{deepseek/deepseek-v4-pro} & DS-direct\,/\,Novita & \texttt{thinking: \{type: "disabled"\}} (DS), \texttt{reasoning: \{enabled: false\}} (OR) \\
+  & reasoning & \texttt{deepseek-v4-pro}\,/\,\texttt{deepseek/deepseek-v4-pro} & DS-direct\,/\,Novita & \texttt{thinking: \{type: "enabled"\}} (DS), \texttt{reasoning: \{effort: "high"\}} (OR) \\
+\midrule
+\multirow{2}{*}{\texttt{deepseek-v4-flash}}
+  & instruct  & \texttt{deepseek-chat}     & DeepSeek direct & (instruct alias) \\
+  & reasoning & \texttt{deepseek-reasoner} & DeepSeek direct & (reasoning alias) \\
+\midrule
+\multirow{2}{*}{\texttt{qwen3-235b}}
+  & instruct  & \texttt{qwen/qwen3-235b-a22b-2507}          & Novita  & instruct SKU \\
+  & reasoning & \texttt{qwen/qwen3-235b-a22b-thinking-2507} & Alibaba & thinking SKU \\
+\midrule
+\multirow{2}{*}{\texttt{qwen3-30b}}
+  & instruct  & \texttt{qwen/qwen3-30b-a3b-instruct-2507} & Nebius     & instruct SKU \\
+  & reasoning & \texttt{qwen/qwen3-30b-a3b-thinking-2507} & AtlasCloud & thinking SKU \\
+\midrule
+anchor (no pair) & instruct & \texttt{anthropic/claude-opus-4.7} & Anthropic & reported separately \\
+\bottomrule
+\end{tabularx}
+\caption{Within-family pairs and upstream pinning. All OpenRouter
+requests use \texttt{allow\_fallbacks: false}. Within each Qwen pair the
+default upstream host differs across siblings (a soft serving-stack
+limitation; see \S\ref{sec:limitations}). $^\dagger$ The
+\texttt{deepseek-v4-pro} pair was originally pinned to OpenRouter via
+Novita; per the 2026-05-15 PREREGISTRATION amendment, cells that
+returned \texttt{provider\_error} or \texttt{empty\_probe\_answer} on
+OR were re-attempted through DeepSeek's first-party API. The final
+analyzable dataset is therefore \emph{mixed}: OR/Novita originals
+that succeeded plus DS-direct recoveries for cells that the originals
+did not produce. The slash-separated values list both
+configurations; see \S\ref{sec:methods:v4pro-routing} for the per-axis
+breakdown of the final mix.}
+\label{tab:models}
+\end{table}
+
+\subsection{V4-pro routing amendment}
+\label{sec:methods:v4pro-routing}
+
+The \texttt{deepseek-v4-pro} pair was originally pinned to OpenRouter
+via Novita, matching the upstream-pinning protocol applied to the other
+OR-served families. Three independent observations on 2026-05-15
+motivated a routing change to DeepSeek's first-party API
+(\texttt{api.deepseek.com}) for all V4-pro retries:
+(i)~\textbf{empty-response rate.}\ On long sycophancy and context-rot
+conversations the OR-served V4-pro reasoning member returned a large
+fraction of HTTP 200 responses with zero completion tokens, which our
+runner correctly recorded as
+\texttt{provider\_empty\_response} exclusions. Live testing against
+\texttt{api.deepseek.com} with the documented native parameter
+(\texttt{thinking: \{type: "enabled"\}}) and a budget of $16{,}384$
+tokens reproducibly returned a populated \texttt{content} field on the
+same prompts. (ii)~\textbf{the V4-family-native parameter is not
+honoured for the legacy \texttt{reasoning} keyword.}\ The DeepSeek
+documentation states explicitly that the V4 family uses
+\texttt{thinking: \{type: "enabled"\|"disabled"\}}; the legacy
+\texttt{reasoning: \{enabled: bool\}} is silently ignored. Empirically
+we verified this on a controlled prompt: V4-pro responses with
+\texttt{reasoning: \{enabled: false\}} continued to emit non-zero
+reasoning tokens, whereas \texttt{thinking: \{type: "disabled"\}}
+produced reasoning tokens of zero. (iii)~\textbf{methodological
+parity}: V4-flash already used DeepSeek-direct, so routing V4-pro the
+same way places both V4-family pairs on the model creator's API and
+removes a confound between the two pairs. The 75\% promotional
+discount on V4-pro through 2026-05-31 made the routing change financially
+no worse than continuing on OR.
+
+The retry rows written through DeepSeek-direct supersede the
+\texttt{provider\_error} / \texttt{provider\_empty\_response} originals
+via the semantic dedup at analysis time
+(\S\ref{sec:methods:dedup}). Both rows remain in the raw JSONL
+audit trail; the analyzable set picked by
+\texttt{dedupe\_to\_latest} is composed of OR/Novita originals where
+they succeeded, plus DS-direct retries on cells where the OR-served
+original failed. Concretely (counts after dedup): on self-consistency,
+$820$ of $1{,}000$ V4-pro-instruct and $400$ of $1{,}000$ V4-pro-reasoning
+cells are OR-original; $180$ and $600$ respectively are DS-direct
+recoveries. On sycophancy, $600$ of $600$ V4-pro-instruct cells are
+OR-original; $260$ of $600$ V4-pro-reasoning are OR-original and the
+other $340$ are DS-direct recoveries. On context-rot, the mix is
+strongly OR-original: $1{,}187$ of $1{,}200$ V4-pro-instruct and
+$1{,}168$ of $1{,}200$ V4-pro-reasoning come from the original Novita
+sweep; the small DS-direct contributions ($13$ and $32$) are
+recoveries on the cells where Novita returned errors or empty bodies.
+The mix is heaviest on the reasoning sycophancy cells precisely
+because that was the cell type most affected by the
+\texttt{max\_tokens}{=}2048 bug.
+
+\subsection{Hyperparameters per experiment}
+
+Table~\ref{tab:hparams} reports temperature, max-tokens, sweep
+dimensions, and total trajectories per family for each of the three
+experiments. Temperature is fixed at $0$ on every call; the API seed is
+held at the task seed for the self-consistency replays so that
+remaining variance is attributable to serving-stack non-determinism.
+The initial sweep used a \texttt{max\_tokens} budget of $2048$, which
+turned out to be below the DeepSeek-recommended default of $32{,}000$ for
+the \texttt{deepseek-reasoner} alias and caused systematic
+empty-content responses on reasoning calls whose CoT exhausted the
+budget. Per the 2026-05-15 PREREGISTRATION amendment, all retries on
+DeepSeek reasoning cells used $\mathrm{max\_tokens}{=}8{,}192$ for
+self-consistency / sycophancy and $\mathrm{max\_tokens}{=}16{,}384$ for
+context-rot (whose longer input conversations leave less of the
+\texttt{completion\_tokens} budget for content after reasoning); Qwen
+instruct retries used $8{,}192$ to fix a smaller truncation issue on
+$h{=}5$ arithmetic. The final analyzable dataset is composed of the
+highest-token successful attempt per logical cell via the semantic
+dedup (\S\ref{sec:methods:dedup}). The original $2048$ rows survive in
+the JSONL audit trail.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{l l l l l}
+\toprule
+Experiment & Task & Sweep dimensions & Per-pair $N$ & Hyperparameters \\
+\midrule
+self-consistency
+  & arithmetic ($h{=}5$)
+  & $40$ tasks $\times 25$ replays
+  & $2{,}000$
+  & $T{=}0$, max tok $2048$ \\
+context rot
+  & variable\_tracking ($n{=}20$)
+  & $50 \times 6 \times 4$
+  & $2{,}400$
+  & $T{=}0$, max tok $2048$ \\
+sycophancy
+  & arithmetic ($h{=}5$)
+  & $50 \times 3 \times 4$
+  & $1{,}200$
+  & $T{=}0$, max tok $2048$ \\
+\bottomrule
+\end{tabular}
+\caption{Hyperparameters and sweep dimensions per experiment.
+Per-pair $N$ counts trajectories collected on \emph{both} members of
+the pair, so an effective paired sample size is half of this when
+matched by task seed.}
+\label{tab:hparams}
+\end{table}
+
+\subsection{Exclusion-rule definitions}
+
+The six exclusion classes (\S\ref{sec:method:ops}) are defined formally
+in \texttt{src/agent\_pathologies/analysis/exclusions.py} and applied at
+analyzer read-time. Class~(i), \texttt{provider\_error}, is
+infrastructure-only and re-attempted on resume; classes~(ii)--(vi) are
+model-behaviour or serving-stack exclusions and are reported as-is.
+Legacy rows tagged \texttt{empty\_probe\_answer} prior to the
+2026-05-14 amendment are retroactively reclassified by
+\texttt{metrics.py::reclassify\_legacy\_exclusions} based on the
+\texttt{output\_tokens} field, idempotently.
+
+\subsection{Semantic deduplication}
+\label{sec:methods:dedup}
+
+The raw JSONL is append-only: every retry attempt writes a new row,
+even when retrying the same logical (model-family, role, task,
+sweep-cell, seed) cell. For the analyzable dataset we apply
+\texttt{dedupe\_to\_latest} (\texttt{src/agent\_pathologies/analysis/metrics.py}),
+which keys cells on \emph{(model-family, role, task, sweep, seed)} —
+intentionally broader than the runner's resume-key, which additionally
+distinguishes by the raw model identifier. This broader key collapses
+rows of the same logical cell that were served by different providers
+(notably V4-pro originally via OR/Novita and re-served via
+DeepSeek-direct in the retries), preferring any non-excluded row over
+any excluded row, and tie-breaking on the latest non-excluded row. The
+result is exactly one row per logical cell in the analyzed dataset
+($N_{\mathrm{analyzable}}$ in Table~\ref{tab:pairs}). All raw rows
+remain in the JSONL for audit.
+
+\subsection{Statistical pipeline}
+
+The analysis pipeline is fully deterministic given the JSONL trajectory
+logs. Bootstrap CIs use $10{,}000$ resamples with a seeded random
+state. McNemar exact tests use the exact binomial form to avoid the
+continuity-correction debate at small discordance counts. BH correction
+is applied across all cells within each axis, separately for each
+co-primary metric in the self-consistency and sycophancy experiments.
+
+\subsection{Reproducibility}
+
+All raw JSONL trajectories will be released alongside the paper, along
+with the analysis CSVs (\texttt{data/*\_paired.csv},
+\texttt{pair\_analysis.csv}) that the figures and tables are produced
+from. Re-running \texttt{scripts/run\_sweep.sh} reproduces the data
+from the same configuration files; re-running
+\texttt{experiments/<axis>/analyze.py} reproduces the figures from the
+data.

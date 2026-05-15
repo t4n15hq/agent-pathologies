@@ -1,0 +1,107 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Why the pattern is selective, not uniform}
+\label{sec:discussion:selective}
+
+The three axes do not move together. Self-consistency
+(\S\ref{sec:results:selfconsistency}) shows the largest, most uniform
+reasoning advantage in the paper: every family, every per-task
+comparison, all sign-test BH-$q < 10^{-11}$. Sycophancy
+(\S\ref{sec:results:sycophancy}) splits sharply: V4-flash crosses the
+preregistered $|\mathrm{gain}|\geq 0.10$ threshold with
+$\mathrm{gain}{=}{+}0.165$ (BH-$q \approx 5{\times}10^{-4}$), but V4-pro
+sits at $\mathrm{gain}{=}{+}0.045$ with a 95\% CI that crosses zero
+($[-0.06, +0.15]$, BH-$q \approx 0.39$)---formally null at the
+preregistered threshold. Context-rot
+(\S\ref{sec:results:contextrot}) is dominated by ceiling effects on
+DeepSeek (instruct already at $1.000$ accuracy across most cells),
+leaving no measurable headroom for reasoning to improve and producing
+a small negative $\Delta_{\mathrm{acc}}$ that we interpret as
+ceiling-bound noise rather than a model regression.
+
+The take-away is that reasoning enablement is not a universal
+robustness lever. It is a \emph{selective} intervention whose benefit
+depends on which axis is being measured and on whether the instruct
+baseline has room to improve. Hard single-shot reasoning is where the
+benefit is sharpest and most uniform; multi-turn pathology
+resistance breaks into a more mixed picture.
+
+\subsection{The capability--sycophancy disentanglement}
+\label{sec:discussion:capability}
+
+A subtler reading of the Qwen pairs is required because of the
+calibration finding documented in
+\S\ref{sec:results:selfconsistency}: both Qwen instruct variants
+mode-collapse on hardness-5 arithmetic to a single stock answer
+(``The answer is $1234.$'') and achieve $0.000$ accuracy on the
+self-consistency probe. The same calibration appears in sycophancy as
+a near-zero $\acc{\mathrm{wrong}}$ ($0.000$ for Qwen-235B, $0.005$ for
+Qwen-30B): the wrong-pushback condition asserts a specific incorrect
+number, the instruct model copies it, and the post-pushback re-probe
+inherits the assertion. The resulting
+$\acc{c}{-}\acc{w}{=}0.855$ on Qwen
+instruct is therefore an upper bound on the sycophancy signal: it
+entangles a true sycophancy effect (the model flips to whatever
+direction is asserted) with a capability gap that prevents the model
+from being right in the first place.
+
+The DeepSeek pairs do not exhibit this confound. On V4-flash, instruct
+attempts the problem and gets roughly half right under wrong pushback
+($\acc{w}{=}0.505$); on V4-pro instruct $\acc{w}{=}0.265$. Both are
+non-zero and the cells exhibit a measurable
+$\acc{c}{-}\acc{w}$ gap that is reduced cleanly by enabling reasoning.
+\emph{The DeepSeek pairs are the load-bearing evidence for the
+sycophancy claim.} The Qwen pairs corroborate the direction (reasoning
+better) but should not be cited numerically as if they measured the
+same effect.
+
+\subsection{Runtime reasoning toggle versus separate post-training}
+\label{sec:discussion:within-vs-cross}
+
+Two of our four pairs (V4-flash, V4-pro) compare reasoning-mode-on
+vs.\ reasoning-mode-off on the \emph{same weights}, served by the same
+host, with the only varying parameter being a runtime flag. The other
+two (Qwen-30B, Qwen-235B) compare separate SKUs that differ at the
+post-training level---instruct vs.\ thinking variants of the same
+base, at matched scale, but on different upstream hosts. The DeepSeek
+design is the cleaner causal estimate of the
+\emph{reasoning-mode contrast}; the Qwen design measures
+reasoning-mode-plus-post-training. Where DeepSeek and Qwen agree on
+direction (all of self-consistency, the Qwen and V4-flash arms of
+sycophancy, all of context-rot on Qwen where ceiling does not apply),
+the effect is attributable to the reasoning contrast across both
+designs. Where they disagree (V4-pro sycophancy null vs.\ Qwen
+sycophancy huge), the runtime-toggle design is stronger evidence and
+the divergence is itself a finding---it suggests Qwen's separate
+post-training does work beyond what a runtime toggle achieves.
+
+\subsection{Comparison with SYCON's cross-family observation}
+\label{sec:discussion:sycon}
+
+Prior work \citep{sycon2025} reports on a heterogeneous panel of
+reasoning-optimized and instruction-tuned models that the
+reasoning-optimized members resist sycophancy better. Our within-family
+result either replicates the direction (and strengthens it by removing
+the cross-family confound) or differs from it (suggesting SYCON's
+panel-average is partially driven by family and scale differences
+rather than the reasoning intervention per se). On the V4-flash and
+both Qwen pairs we replicate the direction with sizeable effects; on
+V4-pro we find a null at our threshold. Read together, the most
+defensible cross-paper claim is that reasoning enablement
+\emph{tends} to reduce sycophancy but the effect is heterogeneous
+within the family of reasoning-enabled variants and does not apply
+uniformly. SYCON's panel-level effect is consistent with this picture.
+
+\subsection{Practical implication}
+\label{sec:discussion:practical}
+
+For practitioners deciding whether to deploy a reasoning-enabled
+variant of a model they already use, our results say: expect a large
+and reliable improvement on hard single-shot reasoning (the standard
+claim); expect a moderate-to-large improvement on pushback resistance
+\emph{but not uniformly} across models in the same family; and do not
+expect reasoning enablement to confer additional robustness on
+multi-turn state-tracking when the instruct sibling is already at
+ceiling. Reasoning enablement is a useful default for hard inference
+problems; it is not a universal robustness fix.

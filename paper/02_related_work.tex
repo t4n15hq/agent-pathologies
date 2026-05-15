@@ -1,0 +1,84 @@
+\section{Related Work}
+\label{sec:related}
+
+We organise prior work by the three pathology axes we measure, then state
+the precise gap our design addresses.
+
+\paragraph{Context rot.}
+\citet{laban2025lostmulti} ran more than $200{,}000$ simulated multi-turn
+conversations across six task domains and reported an average $39\%$
+accuracy drop relative to the equivalent single-turn problem, decomposable
+into a small aptitude loss and a large unreliability increase.
+\citet{liu2025drift} reframe the phenomenon as a context-equilibrium
+problem, and \citet{ren2026intent} attribute the drop primarily to
+turn-by-turn intent mismatch. \citet{zhao2026conversationtree} introduce
+the related notion of ``logical context poisoning'' from progressive
+structural corruption. Adjacent but distinct lines include
+single-prompt long-context benchmarks such as NOLIMA
+\citep{modarressi2025nolima} and memory-architecture evaluations such as
+MemoryAgentBench \citep{hu2025memoryagentbench}.
+
+\paragraph{Sycophancy.}
+\citet{hong2025sycon} introduce SYCON Bench with \emph{Turn-of-Flip} and
+\emph{Number-of-Flip} metrics for multi-turn sycophancy and report---on a
+heterogeneous panel that crosses families---that reasoning-optimised
+models generally resist sycophancy better than instruction-tuned models.
+\citet{fanous2025syceval} report that ``once a model yields to a user
+assertion, agreement-seeking behaviour often persists across subsequent
+turns'', the verbatim phrasing of the persistence claim. Domain
+variations cover scientific QA \citep{zhang2025sycopressure}, clinical
+encounters \citep{kim2026sycoevalem}, financial agents
+\citep{wang2026priceofagreement}, and moral-judgment perturbations
+\citep{li2026moralfragility}. \citet{xu2025notonething} argue
+sycophancy is causally decomposable rather than monolithic, and
+\citet{chen2025beacon} propose a single-turn diagnostic for latent
+sycophantic tendencies.
+
+\paragraph{Self-consistency under deterministic settings.}
+\citet{atil2024nondeterminism} report up to $15\%$ accuracy variance and
+a $70\%$ best-to-worst gap across $10$ replays of the same prompt under
+nominally deterministic configuration. \citet{he2024numerical} give a
+mechanistic explanation: tiny logit gaps combined with BF16/FP16
+numerical fluctuations cause non-determinism that disappears under FP32.
+\citet{shen2025smallllmnondet} extend this to $2$--$8$B models, and
+\citet{gat2025outputdrift} document the cross-provider variant in which
+the same model name returns different distributions across hosting
+providers.
+
+\paragraph{Agent-failure context.}
+\citet{wang2025agentfail}, \citet{yu2025trajectbench}, and
+\citet{lin2025agentracer} build failure taxonomies and localisation
+methods for tool-using agents. These are adjacent neighbours rather than
+direct competitors: our setting is multi-turn conversational
+pathologies, not tool execution.
+
+\paragraph{What is novel here.}
+Each of the works above studies one pathology axis on its own panel and
+in many cases on a single model family. Where reasoning-enabled variants
+are implicated---most explicitly in SYCON \citep{hong2025sycon}---the
+comparison crosses model families, so the reasoning-mode effect is
+confounded with base architecture and scale. To our knowledge, this is the first
+study that simultaneously (i) applies a within-family paired design
+across multiple model families, (ii) measures three pathology axes on
+the same pairs with the same task seeds, and (iii) preregisters
+hypotheses, effect-size floors, multiple-comparisons correction, and
+exclusion rules before any real-model data was collected.
+
+\paragraph{Design-strength caveat by family.}
+Within the within-family-paired framing, our four pairs are \emph{not}
+controlled to the same degree, and we are explicit about which contrast
+each pair supports. The DeepSeek V4-pro and V4-flash pairs are the
+strongest contrast: in each, the same underlying model is served by the
+same upstream provider, with the reasoning behaviour toggled at request
+time---so base weights, scale, and serving host are all held fixed and
+the only varying factor is the runtime reasoning flag (V4-pro) or the
+model-alias selection that maps to the same weights with thinking on/off
+(V4-flash). The Qwen3-235B and Qwen3-30B pairs are weaker: they match
+base family and active-parameter count, but the instruct SKU and
+thinking SKU are shipped as separate model identifiers and, in our
+deployment, are served by \emph{different} upstream providers (Novita
+vs Alibaba for Qwen3-235B; Nebius vs AtlasCloud for Qwen3-30B). We
+treat the Qwen pairs as evidence of family-and-scale-matched
+behavioural differences, but not as a same-weights-same-host contrast.
+This soft caveat is reiterated wherever the Qwen pairs are discussed in
+results.

@@ -1,0 +1,94 @@
+\section{Limitations}
+\label{sec:limitations}
+
+The design has several limitations that we surface here rather than
+relegate to a back-matter paragraph.
+
+\paragraph{Capability/sycophancy confound on Qwen.}
+The cleanest sycophancy signal lives on pairs where both siblings
+\emph{attempt} the problem at non-trivial accuracy. On the Qwen pairs,
+the instruct sibling tends to mode-collapse on hardness-$5$
+arithmetic---during stage-1 calibration we observed the Qwen instruct
+variant emitting the same stock string to roughly two-thirds of
+prompts. When the instruct baseline accuracy is near zero, the
+reasoning-versus-instruct contrast on $\acc{\mathrm{correct}} -
+\acc{\mathrm{wrong}}$ entangles two effects: a genuine sycophancy
+difference and a capability gap that prevents the instruct member from
+ever being in a position to flip. We report this explicitly when the
+DeepSeek and Qwen DiD estimates disagree. The DeepSeek pairs, where both
+siblings share base weights, give the cleaner sycophancy signal.
+
+\paragraph{Empty-response cells recovered via configuration amendment.}
+The original sweep produced a substantial
+\texttt{empty\_probe\_answer} / \texttt{provider\_empty\_response}
+class concentrated on DeepSeek reasoning members
+($\approx\!668$ on \texttt{deepseek-reasoner} and $\approx\!407$ on
+\texttt{deepseek-v4-pro} reasoning during stage-1 calibration), at first
+treated as a model-side behavioural signal. Diagnostic work on
+2026-05-15 traced these rows to an experimenter-configuration error:
+\texttt{max\_tokens}{=}2048 was below DeepSeek's recommended default of
+32K for reasoning models, so the entire budget was consumed by
+\texttt{reasoning\_content} (CoT), leaving zero tokens for
+\texttt{content} (the final visible answer). Per the same-day
+amendment to the preregistration, the affected cells were re-attempted
+through DeepSeek's first-party API with $\mathrm{max\_tokens}\in
+\{8{,}192, 16{,}384\}$ and recovered cleanly. The final analyzable
+dataset is composed of these higher-token successful attempts via
+semantic dedup; the original $2048$-token rows survive in the
+JSONL audit trail. The earlier framing of empty-content as a
+serving-stack signal is therefore retracted---the asymmetry was an
+artefact of our \texttt{max\_tokens} choice, not a model property. We
+report the per-cell coverage post-amendment in
+Table~\ref{tab:pairs}; every (family, role, axis) cell is at its
+preregistered $N$ in the analyzable set. We retain this paragraph as a
+candid disclosure of how the issue was discovered and corrected.
+
+\paragraph{Single difficulty level on arithmetic axes.}
+Both the self-consistency and sycophancy experiments are run at a
+single hardness ($h{=}5$). This was a deliberate choice---hardness $5$
+sits in the non-saturated band where pathology signals have room to
+register---but it means the paper does not present a dose-response
+curve of pathology magnitude against task difficulty. Whether the
+selective-intervention pattern strengthens or weakens at lower
+difficulties is left to a follow-up.
+
+\paragraph{No closed-frontier anchor in the primary results.}
+A stage-2 anchor on \texttt{anthropic/claude-opus-4.7} is provisioned
+in the configuration but is not part of the paired test
+(\S\ref{sec:method:pairing}). The preregistration amendment dated
+2026-05-13 records the staged rollout: stage 1 is the paired Chinese
+open-weight slice; stage 2 is the closed-frontier anchor when budget
+permits. The headline within-family claim is independent of the anchor.
+
+\paragraph{Within-Qwen-pair upstream-provider difference.}
+On both Qwen pairs the default upstream host differs between siblings
+(Novita instruct vs.\ Alibaba thinking on $235$B; Nebius instruct vs.\
+AtlasCloud thinking on $30$B). We acknowledge this as a soft
+limitation of the Qwen pairing's serving-stack equivalence. The
+DeepSeek pairs do not have this issue---both siblings share an upstream
+host---so a finding that replicates on DeepSeek strengthens the
+within-family attribution; a finding that appears only on Qwen should
+be read with the upstream caveat in mind.
+
+\paragraph{Behavioural-only.}
+The paper measures input-output behaviour. It does not open the model
+or attempt to localise the mechanism behind any observed pathology
+shift. Mechanistic follow-up on an open-weight pair (e.g.\ probing
+attention from the probe token back to the plant token across the
+filler sweep on Qwen3-30B) is sketched in the project preregistration
+as Pivot B but is out of scope here.
+
+\paragraph{Domain coverage.}
+The three tasks share a tight domain: integer arithmetic with one
+extension to running variable tracking. This is deliberate---all three
+are strictly scorable without an LLM judge, which is essential for
+preregistered analysis---but it limits the immediate generalisation to
+free-form natural-language tasks where wrong answers can be more
+gracefully smuggled.
+
+\paragraph{Provider scope.}
+Within-family pairs are restricted to Chinese open-weight families
+because, at time of writing, those are the families that ship matched
+instruct and reasoning siblings at the same scale. We do not claim the
+within-family pattern generalises to closed-frontier reasoning models
+without further data.

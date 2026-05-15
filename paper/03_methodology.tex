@@ -1,0 +1,204 @@
+\section{Methodology}
+\label{sec:method}
+
+The design decision that organises everything else is the within-family
+pairing. We describe the pairing first
+(\S\ref{sec:method:pairing}), then the three tasks
+(\S\ref{sec:method:tasks}), and finally the operational guarantees that
+make the pairing meaningful---upstream-provider pinning, frozen
+exclusion classes, resumable execution, and verifiable scoring
+(\S\ref{sec:method:ops}).
+
+\subsection{Within-family paired design}
+\label{sec:method:pairing}
+
+A canonical comparison such as ``does enabling a model's reasoning mode
+change multi-turn behaviour?'' is usually answered by reading off
+accuracy deltas across heterogeneous panels---e.g.\ a reasoning-enabled
+model from lab A against an instruct model from lab B. Such a comparison
+conflates the reasoning-mode contrast with base model, scale, data mix,
+RLHF recipe, and serving stack. We avoid that confound by restricting attention to four
+model \emph{families} that ship matched instruct and reasoning siblings:
+
+\begin{enumerate}
+  \item \textbf{DeepSeek V4-pro.} Same weights, two
+        configurations of the reasoning toggle. The original sweep
+        was pinned to Novita via OpenRouter
+        (\texttt{reasoning: \{enabled: false\}} for instruct,
+        \texttt{reasoning: \{effort: "high"\}} for reasoning); per the
+        2026-05-15 amendment a subset of cells was recovered via the
+        DeepSeek first-party API with the V4-family-native
+        \texttt{thinking: \{type: "enabled"\|"disabled"\}} parameter.
+        The final analyzable dataset therefore mixes OR/Novita
+        originals with DS-direct recoveries on a per-cell basis; see
+        \S\ref{sec:methods:v4pro-routing} for the rationale, accounting,
+        and per-axis breakdown.
+  \item \textbf{DeepSeek V4-flash.} Same weights, served by DeepSeek
+        direct. The legacy aliases \texttt{deepseek-chat} and
+        \texttt{deepseek-reasoner} route the same family through the
+        instruct and reasoning code paths respectively.
+  \item \textbf{Qwen3-235B (a22b).} Two SKUs published by Alibaba at the
+        same active-parameter count: \texttt{qwen3-235b-a22b-2507}
+        (instruct, served via Novita) and
+        \texttt{qwen3-235b-a22b-thinking-2507} (reasoning, served via
+        Alibaba).
+  \item \textbf{Qwen3-30B (a3b).} \texttt{qwen3-30b-a3b-instruct-2507}
+        (served via Nebius) and \texttt{qwen3-30b-a3b-thinking-2507}
+        (served via AtlasCloud).
+\end{enumerate}
+
+For DeepSeek pairs base architecture, scale, training run, and serving
+host are all held constant; only the reasoning toggle varies, so the
+paired contrast isolates the reasoning effect. For Qwen pairs the
+families and active-parameter counts match, but the default upstream
+host differs across siblings (Novita vs.\ Alibaba on the 235B pair;
+Nebius vs.\ AtlasCloud on the 30B pair). We document this as a soft
+limitation of the Qwen pairing's serving-stack equivalence
+(\S\ref{sec:limitations}) and report Qwen and DeepSeek results
+separately so a reader can attribute any disagreement to the routing
+difference.
+
+This design is stronger than the pairing proposed in the original
+preregistration (\texttt{deepseek-v4-pro} vs.\ \texttt{deepseek-r1-0528}),
+which crossed two distinct base models. The amendment log dated
+\textsl{2026-05-13 (further)} replaces that exploratory pairing with the
+within-model reasoning-toggle design above, eliminating the
+architecture/scale confound on the DeepSeek side.
+
+\subsection{Three tasks, all integer-scored}
+\label{sec:method:tasks}
+
+All tasks emit a single integer answer that is extracted from the
+model's response by a strict regular-expression scorer with
+word-boundary matching. No LLM judge is invoked at any point in the
+analysis loop.
+
+\paragraph{Self-consistency: hard arithmetic (hardness $5$).}
+The model is asked to evaluate a closed-form arithmetic expression in
+$12$ four-digit operands with squares, modulo, integer division, and
+nested grouping. Hardness $5$ was chosen so frontier models do not
+saturate at $100\%$---which would leave no headroom for either
+divergence or accuracy measurement. The same task seed is replayed
+$N{=}25$ times at temperature $0$ with the API seed fixed at the
+\texttt{task\_seed}, so any cross-replay divergence is attributable to
+serving-stack non-determinism rather than nominal sampling randomness.
+Per-task divergence is the fraction of replays whose extracted answer
+differs from the modal extracted answer.
+
+\paragraph{Context rot: variable tracking ($n_{\mathrm{updates}} = 20$).}
+The model maintains a running integer state \texttt{x} across $20$
+chained update turns---each turn applies an add, subtract, or multiply
+operation---then is asked at probe for the final value of \texttt{x}.
+This is a stronger context-rot signal than single-fact recall because
+the probe is unanswerable without actually carrying state across turns.
+Between the update block and the probe we insert $n_{\mathrm{filler}}
+\in \{0, 2, 5, 10, 20, 40\}$ filler turn-pairs of one of four kinds:
+\texttt{irrelevant} (chitchat), \texttt{related} (math-adjacent),
+\texttt{token\_matched} (fixed-length filler at the same turn count
+controlling for content variability), and \texttt{collapsed} (a single
+fat user-assistant pair whose total token mass matches the cumulative
+token mass of $n_{\mathrm{filler}}$ small pairs). The
+\texttt{collapsed} kind is the true turn-vs-token control: comparing
+accuracy at (\texttt{irrelevant}, $k{=}20$) against (\texttt{collapsed},
+$k{=}20$) holds total tokens approximately constant while collapsing
+$40$ turns into $2$, isolating turn-count effects from token-mass
+effects.
+
+\paragraph{Sycophancy: arithmetic-with-pushback (hardness $5$).}
+The protocol is original probe $\rightarrow$ model answer $A$
+$\rightarrow$ user pushback $\rightarrow$ model answer $A'$ $\rightarrow$
+$g$ neutral filler pairs $\rightarrow$ re-probe $\rightarrow$ model
+answer $A''$ (scored). The pushback condition is one of three: in the
+\texttt{wrong} condition the user asserts a wrong integer answer (a
+$+7$ perturbation of the truth that preserves magnitude and sign); in
+the \texttt{correct} condition the user asserts the right answer; in
+the \texttt{neutral} condition the user expresses doubt without
+asserting any value. The \texttt{correct} condition is the critical
+control: a model that flips on \texttt{correct} pushback is generically
+capitulating, not sycophantic. The interpretable signal is
+$\acc{\mathrm{correct}} - \acc{\mathrm{wrong}}$. The post-pushback gap
+is $g \in \{0, 2, 5, 10\}$ neutral filler pairs.
+
+The 2026-05-14 amendment log records the switch from a CRT-style
+counterintuitive-math task to hardness-5 arithmetic. The reason was
+empirical: stage-1 calibration showed that reasoning models solved CRT
+items so reliably at baseline that wrong pushback produced essentially
+no flip rate---a ceiling that hid any reasoning-vs-instruct difference.
+Hardness-5 arithmetic creates legitimate uncertainty in model answers,
+giving wrong pushback room to register.
+
+\subsection{Operational guarantees}
+\label{sec:method:ops}
+
+\paragraph{Upstream-provider pinning.}
+Every OpenRouter request specifies a single pinned upstream host
+(\texttt{configs/models.yaml: upstream\_provider}) with
+\texttt{allow\_fallbacks: false}. Without pinning, OpenRouter
+load-balances across upstream hosts---which would silently confound a
+paired test if one sibling was served by a different actual provider on
+different days. After each completion we verify the response's reported
+provider header against the pinned value and tag a mismatch as a
+distinct exclusion class
+(\texttt{upstream\_provider\_mismatch}).
+
+\paragraph{Six frozen exclusion classes.}
+Trajectories are excluded from analysis if and only if they fall into
+one of six classes, all frozen alongside the preregistration:
+(i) \texttt{provider\_error:*}: the request never reached the model
+after retries (HTTP failure or credit exhaustion). Because the model
+never produced output, these are re-attempted on resume rather than
+counted as model-behaviour exclusions.
+(ii) \texttt{refusal\_detected}: detected by absence of any digit in
+the probe answer for arithmetic and variable-tracking tasks.
+(iii) \texttt{truncated\_at\_max\_tokens}: missing terminating
+punctuation \emph{and} output length equal to \texttt{max\_tokens}.
+(iv) \texttt{upstream\_provider\_mismatch}: a fallback fired despite
+\texttt{allow\_fallbacks: false}.
+(v) \texttt{empty\_probe\_answer}: scorer found no integer in a
+non-empty response (a true scoring failure).
+(vi) \texttt{provider\_empty\_response}: the provider returned HTTP $200$
+with an empty body and \texttt{output\_tokens == 0}, added in the
+2026-05-14 amendment after stage-1 calibration revealed
+${\sim}1{,}100$ such rows misclassified as \texttt{empty\_probe\_answer},
+concentrated on \texttt{deepseek-reasoner} and \texttt{deepseek-v4-pro
+reasoning} via Novita.
+
+\emph{Originally we treated these as deterministic and not silently
+re-attempted; the 2026-05-15 amendment retracts that judgment.}
+Targeted diagnostics on 2026-05-15 showed the empties were the
+downstream consequence of our \texttt{max\_tokens}{=}2048 setting being
+below the DeepSeek-recommended default of $32{,}000$ for reasoning
+models, so the entire budget was consumed by \texttt{reasoning\_content}
+(CoT) and \texttt{content} came back empty. Affected cells were re-attempted
+through DeepSeek's first-party API with
+$\mathrm{max\_tokens}\in\{8{,}192, 16{,}384\}$ and recovered cleanly;
+the analyzable dataset is composed of the recovered rows via semantic
+dedup (\S\ref{sec:methods:dedup}). The original $2048$-token rows
+survive in the JSONL audit trail. Classes (ii)--(vi) remain reported
+on whatever residual fraction the recovery did not clear; only (i)
+\texttt{provider\_error} continues to be silently re-attempted under
+the runner's resume logic.
+
+\paragraph{Resumable runner with content-hashed cell keys.}
+Each trajectory is keyed by a content hash of (model, task seed,
+sweep-cell coordinates). The JSONL log is appended in place. On resume
+the runner skips any cell whose key already exists in the log. This
+guarantees that a transient infrastructure failure mid-sweep cannot
+silently corrupt a cell---the missing rows are simply re-attempted on
+the next run, and only rows that produced a real model response are
+counted.
+
+\paragraph{Verifiable scoring, no LLM judges.}
+All three tasks score a single extracted integer against a known
+ground-truth integer using word-boundary regular expressions
+(\texttt{src/agent\_pathologies/tasks/scoring.py}). This avoids the
+known reliability issues with LLM-judge scoring on arithmetic-adjacent
+tasks and makes the entire analysis pipeline reproducible from the raw
+JSONL.
+
+\paragraph{Paired by task seed.}
+The paired statistical tests in Section~\ref{sec:hypotheses} are
+constructed by matching trajectories on
+$(\mathrm{family}, \mathrm{task\_seed}, \mathrm{sweep\_cell})$. The same
+seed is run on both members of a pair, so the comparison conditions on
+task identity and not just on marginal accuracy.

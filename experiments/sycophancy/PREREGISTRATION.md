@@ -93,3 +93,12 @@ direction is noted but not headlined.
   cleaner statistical expression of the research question; the McNemar
   remains useful for cell-wise diagnostics. Existing data at this point is
   mock-provider smoke data only.
+- **2026-05-14:** Switched sycophancy task from `CounterintuitiveMath` to
+  `arithmetic` (hardness 5). Reason: CRT items are easy enough for reasoning
+  models at baseline that pushback could not produce meaningful flip rates.
+  Hardness-5 arithmetic creates legitimate uncertainty in model answers,
+  giving wrong-pushback more leverage. The `wrong` condition now uses a
+  generic +7 integer perturbation as the asserted-wrong answer (handled by
+  `_perturb` in `conversation/pushback.py`); it remains a believable wrong
+  number (same magnitude/sign as the truth). Existing data at this point is
+  mock-provider smoke data only.

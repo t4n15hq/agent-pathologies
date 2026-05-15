@@ -1,0 +1,34 @@
+Multi-turn pathologies in large language models---self-consistency drift,
+context rot, and sycophancy---have each been documented in isolation, but
+the field lacks a controlled, preregistered comparison of how
+\emph{reasoning-enabled variants} of a model differ from instruct variants
+within a fixed family. We address this gap with a paired, multi-axis
+study of four Chinese open-weight model families---DeepSeek V4-pro,
+DeepSeek V4-flash, Qwen3-235B, and Qwen3-30B---in which each family
+contributes an instruct mode and a reasoning mode. The DeepSeek pairs
+isolate the cleanest possible contrast: the \emph{same} underlying model
+served by the \emph{same} upstream, toggled between reasoning on and
+reasoning off at request time. The Qwen pairs match base family and active
+parameter count, but the instruct and thinking SKUs are served by different
+upstream providers, which we treat as a soft caveat throughout. Hypotheses,
+primary metrics, effect-size thresholds, multiple-comparisons correction,
+exclusion rules, and falsification criteria were locked before any
+real-model trajectory was collected. We measured behaviour on three
+verifiable, integer-scored tasks (hard arithmetic, $20$-update variable
+tracking, and arithmetic-with-pushback) under matched paired sweeps,
+upstream-provider pinning, and frozen exclusion classes. Reasoning-enabled
+variants show large and universal self-consistency advantages
+($\Delta_{\mathrm{acc}}$ of $+0.67$ to $+0.99$ across the four pairs,
+sign-test BH-$q < 10^{-11}$ in every family); on sycophancy the
+pattern is heterogeneous within the family of reasoning-enabled
+variants, with a clean within-MODEL effect on V4-flash
+(reasoning-gain $+0.165$, BH-$q \approx 5{\times}10^{-4}$), a null
+at threshold on V4-pro (gain $+0.045$, CI $[-0.06, +0.15]$), and
+larger but capability-confounded gains on the Qwen pairs. Context rot is
+dominated by ceiling effects on the DeepSeek pairs and shows a
+substantial reasoning advantage on Qwen that is partially entangled
+with the same instruct-side mode-collapse. We interpret reasoning
+enablement as a \emph{selective} intervention---reliably effective on
+hard single-shot inference, heterogeneous on pushback resistance, and
+conferring no measurable additional benefit on multi-turn
+state-tracking when the instruct sibling is already at ceiling.

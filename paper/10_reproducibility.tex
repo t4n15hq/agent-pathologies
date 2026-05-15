@@ -1,0 +1,95 @@
+\section{Reproducibility}
+\label{sec:reproducibility}
+
+We commit to reproducibility at the per-trajectory level. The companion
+repository ships the locked preregistration, all amendments with dates,
+the exact configuration files, the data-collection harness, the
+statistical analysis pipeline, and all raw and cleaned trajectory logs
+under permissive licensing.
+
+\paragraph{Code and data release.}
+\begin{itemize}
+  \item \textbf{Repository:}
+        \texttt{github.com/t4n15hq/agent-pathologies}
+  \item \textbf{License:} CC BY 4.0 for the paper and accompanying
+        data; MIT for the code
+  \item \textbf{Data:} the three \texttt{data/*\_clean.jsonl} files (one
+        per experiment) carry the analyzable dataset after semantic
+        deduplication (\S\ref{sec:methods:dedup}); the raw
+        \texttt{data/*.jsonl} files carry the full audit trail
+        including superseded retry rows; the \texttt{figures/} PDFs
+        are in the release archive.
+\end{itemize}
+
+\paragraph{Configuration and amendments.}
+\begin{itemize}
+  \item \texttt{configs/models.yaml} (within-family pairs, upstream pins)
+  \item \texttt{configs/pivot\_a.yaml} (sweep parameters: $n_{\mathrm{tasks}}$,
+        replays, filler counts/kinds, conditions/gaps, $T = 0$,
+        \texttt{max\_tokens} per axis)
+  \item \texttt{PREREGISTRATION.md} (root) and
+        \texttt{experiments/*/PREREGISTRATION.md} (per-experiment) with
+        the dated amendment log. Every amendment in the log is reflected
+        in the final code state.
+\end{itemize}
+
+\paragraph{Run metadata.}
+\begin{itemize}
+  \item \textbf{Data-collection dates:} 2026-05-13 to 2026-05-15,
+        including the initial sweep and the three amendments (cell-key
+        fix on 2026-05-14; \texttt{max\_tokens} bug-fix and V4-pro
+        routing change on 2026-05-15).
+  \item \textbf{Trajectory counts (raw / analyzable / superseded-by-retry):}
+        self-consistency $10{,}573$ / $8{,}000$ / $2{,}573$;
+        sycophancy $5{,}467$ / $4{,}800$ / $667$;
+        context rot $15{,}862$ / $9{,}600$ / $6{,}262$. Every
+        (family, role, axis) cell is at its preregistered $N$ in the
+        analyzable set.
+  \item \textbf{Total cost:} approximately \$170 USD (OpenRouter spend
+        \$155, DeepSeek-direct \$15) across the four Chinese
+        open-weight families.
+\end{itemize}
+
+\paragraph{Regenerating the analyses.}
+From the repository root:
+\begin{verbatim}
+# 1. Set up the environment
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# 2. (Optional) Run the post-sweep clean-up passes
+python scripts/retry_truncated.py --apply
+python scripts/clean_dataset.py
+
+# 3. Per-axis paired tests + cell-level summaries
+python experiments/self_consistency/analyze.py
+python experiments/context_rot/analyze.py
+python experiments/sycophancy/analyze.py
+
+# 4. Cross-axis headline used in the paper
+python scripts/pair_analysis.py
+\end{verbatim}
+Each analyser is deterministic given the input JSONL; bootstrap CIs and
+permutation tests use a fixed seed (\texttt{seed=42}) hard-coded in
+\texttt{src/agent\_pathologies/analysis/stats.py}.
+
+\paragraph{File hashes.}
+For audit purposes, the SHA-256 hashes of the released cleaned JSONL
+files are:
+\begin{itemize}
+  \item \texttt{data/self\_consistency\_clean.jsonl}: \texttt{ff9eecc6\dots f5f0ddb3}
+  \item \texttt{data/context\_rot\_clean.jsonl}: \texttt{61c1a4fb\dots 0c0852751}
+  \item \texttt{data/sycophancy\_clean.jsonl}: \texttt{5f36a88f\dots 0108371b}
+\end{itemize}
+Full hashes are pinned in the release tag and reproducible with
+\texttt{shasum -a 256 data/*\_clean.jsonl} after running
+\texttt{python scripts/clean\_dataset.py}.
+
+\paragraph{Provider-pinning verification.}
+Every trajectory in the released JSONL carries an
+\texttt{extra.upstream\_pinned} field and an
+\texttt{extra.upstream\_actual} field. Exclusion rule \S6.4
+(\texttt{upstream\_mismatch}) drops any trajectory where the two differ.
+A reader can audit the entire dataset for routing correctness with one
+\texttt{jq} query against the JSONL.
+

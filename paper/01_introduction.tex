@@ -1,0 +1,91 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Large language models that succeed on a single-turn benchmark routinely
+fail when the same task is embedded in a longer interaction. Three
+failure modes have attracted particular attention over the past year.
+\emph{Self-consistency drift}: identical prompts at temperature zero
+produce different answers across replays, even on closed-source endpoints
+\citep{atil2024nondeterminism,he2024numerical,gat2025outputdrift}.
+\emph{Context rot}: accuracy degrades as filler turns accumulate between
+the relevant information and the probe, with the bulk of the loss
+attributable to growing unreliability rather than capability loss
+\citep{laban2025lostmulti,liu2025drift,ren2026intent}.
+\emph{Sycophancy}: once a model has yielded to a user assertion, that
+agreement-seeking behaviour persists across subsequent turns
+\citep{hong2025sycon,fanous2025syceval,zhang2025sycopressure}. Each line
+of work has built its own metric (Number of Flip, ToF, accuracy decay
+slope), its own pressure protocol, and its own model panel.
+
+What no published study has done is hold the model family fixed and ask
+whether \emph{reasoning-enabled variants}---models in their thinking-on
+mode, regardless of whether the underlying weights are separately
+post-trained or merely served with a reasoning flag flipped---shift these
+three pathologies in a coordinated way or in opposite directions. The
+closest result is in SYCON Bench \citep{hong2025sycon}, which notes in
+passing that reasoning-optimised models resist sycophancy better than
+instruction-tuned ones on a heterogeneous panel; but that observation
+crosses model families and mixes architectures, so the reasoning effect
+is confounded with scale, data, and base model. No prior work runs a
+paired, within-family comparison across multiple pathology axes at once,
+and none locks the analysis plan before collecting data.
+
+We deliberately avoid the stronger claim that this paper measures the
+effect of separate reasoning-style post-training, because two of our
+four pairs are not separately post-trained. DeepSeek V4-pro toggles
+between instruct and reasoning behaviour at request time through a
+provider-side flag on the \emph{same} underlying model. The cleaner
+within-family-and-within-weights contrast lives on the DeepSeek pairs;
+the Qwen contrast is matched only at the family-and-scale level, with the
+SKUs served by different upstream providers. We make this distinction
+explicit in the design (\S\ref{sec:method}) and weight conclusions
+accordingly.
+
+We close that gap. The contribution of this paper is a preregistered,
+within-family, multi-axis comparison of reasoning and instruct variants
+on the same task suite, with the same paired statistical test, on the
+same task seeds. The four model pairs are drawn from the Chinese
+open-weight ecosystem because that ecosystem ships explicit
+instruct/reasoning siblings of the same family: DeepSeek V4-pro toggled
+between instruct and reasoning modes via an OpenRouter routing parameter;
+DeepSeek V4-flash toggled between the legacy \texttt{deepseek-chat} and
+\texttt{deepseek-reasoner} aliases that share weights but differ in
+serving-time reasoning behaviour; Qwen3-235B and Qwen3-30B, each shipped
+as separate instruct and thinking SKUs at the same active-parameter
+count. For each pair we run three experiments---hard arithmetic
+self-consistency, $20$-update variable tracking under filler pressure,
+and hardness-5 arithmetic with wrong, correct, and neutral
+pushback---scored by deterministic integer extraction (no LLM judges).
+Hypotheses, primary metrics, an effect-size floor of Cohen's $h \geq
+0.20$, BH multiple-comparisons correction within each axis, six frozen
+exclusion classes, and falsification criteria were committed in
+\texttt{PREREGISTRATION.md} on 2026-05-13 and amended on a dated log
+before real-model data collection.
+
+The findings preview as follows. The headline pattern is that
+reasoning-enabled variants do \emph{not} provide a uniform robustness
+boost across the three axes. On \textbf{self-consistency} they show
+large, consistent gains in every family ($\Delta_{\mathrm{acc}}$ of
+$+0.67$ to $+0.99$, sign-test BH-$q < 10^{-11}$). On
+\textbf{sycophancy} the pattern is heterogeneous within the family of
+reasoning-enabled variants: V4-flash shows a clean within-MODEL effect
+(reasoning-gain $+0.165$, BH-$q \approx 5{\times}10^{-4}$); V4-pro is
+null at the preregistered $|\mathrm{gain}|\geq 0.10$ threshold (gain
+$+0.045$, CI $[-0.06, +0.15]$); the Qwen pairs show larger gains that
+are partially confounded with an instruct-side capability mode-collapse
+on hard arithmetic. On \textbf{context rot} the DeepSeek pairs are
+dominated by ceiling effects (instruct already at $1.000$ accuracy
+across most cells, leaving no headroom), and the Qwen pairs show a
+substantial reasoning advantage that is again partially entangled with
+the same capability gap. We frame this as a \emph{selective}
+intervention---reliably effective on hard single-shot inference,
+heterogeneous on pushback resistance, and conferring no measurable
+additional benefit on multi-turn state-tracking when the instruct
+sibling is already at ceiling. The remainder of the paper
+develops this in detail. Section~\ref{sec:related} positions the work
+against the three axis-specific literatures; Section~\ref{sec:method}
+explains the paired design and the four model pairs;
+Section~\ref{sec:hypotheses} states the locked analysis plan;
+Section~\ref{sec:setup} reports the exact sweep parameters and
+exclusion accounting; Sections~\ref{sec:results}--\ref{sec:conclusion}
+present results, discussion, and limitations.
