@@ -237,44 +237,6 @@ ceilinged.
   SycEval, "LLMs Get Lost in Multi-Turn", non-determinism work) that
   motivated the Pivot A within-family design
 
-## Reproducibility pointers
-
-For anyone trying to re-run the sweep or recompile the paper:
-
-```bash
-# Environment
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env       # add OPENROUTER_API_KEY and DEEPSEEK_API_KEY
-
-# Mock smoke test (no API calls)
-bash scripts/run_sweep.sh --mock
-
-# Full sweep (resumable; expect ~$220 USD total spend at current OR/DS prices)
-bash scripts/run_sweep.sh
-
-# Produce the cleaned/deduped JSONL the paper figures consume
-python scripts/clean_dataset.py
-
-# Per-axis analyzers + the cross-axis headline CSV
-python experiments/self_consistency/analyze.py
-python experiments/sycophancy/analyze.py
-python experiments/context_rot/analyze.py
-python scripts/pair_analysis.py
-
-# Regenerate the 8 paper figures from the cleaned data
-python scripts/make_paper_figures.py
-
-# Compile the paper (requires tectonic, pdflatex, or latexmk)
-cd paper && tectonic main.tex
-```
-
-63 unit tests cover the runner, scoring, statistical helpers, and the
-dedup pipeline; run with `python -m pytest tests/`. The amendment log
-in `PREREGISTRATION.md` and the per-experiment preregistration
-documents in `experiments/*/PREREGISTRATION.md` are the canonical
-record of what was preregistered, what changed, when, and why.
-
 ## License
 
 Code: MIT. Paper and data: CC BY 4.0.
