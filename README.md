@@ -29,7 +29,7 @@ and serving stacks, conflating the reasoning-mode contrast with every
 other dimension.
 
 **Our research question:** Does enabling a model's reasoning mode
-\emph{by itself} change its multi-turn pathology resistance, when
+*by itself* change its multi-turn pathology resistance, when
 everything else (base weights, scale, serving host) is held constant?
 
 ## Why this matters
@@ -54,7 +54,7 @@ selective-intervention reading:
 ## The three failure modes we tested
 
 1. **Self-consistency.** Hardness-5 arithmetic, 25 replays at $T=0$
-   per task per model. The pathology is the model giving \emph{different}
+   per task per model. The pathology is the model giving *different*
    answers across identical replays (or worse, the same wrong answer
    each time — capability mode-collapse). Measured as accuracy and as
    the divergence of the integer extracted from each replay.
@@ -174,7 +174,7 @@ multi-turn pathology resistance — large where the instruct sibling has
 inference headroom, null where the instruct sibling is already
 ceilinged.
 
-## Caveats and what the paper does \emph{not} claim
+## Caveats and what the paper does *not* claim
 
 1. **Qwen capability confound.** Both Qwen instruct SKUs mode-collapse
    on hardness-5 arithmetic, emitting the placeholder integer
