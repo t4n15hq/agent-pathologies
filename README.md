@@ -1,7 +1,5 @@
 # agent-pathologies
 
-**Paper:** [`paper/main.pdf`](paper/main.pdf)
-
 This is a preregistered study of a simple question:
 
 > When an AI model is given a "reasoning mode," does it actually become
