@@ -211,18 +211,16 @@ Qwen-30B  & reasoning & $0.985$ & $0.990$ & $0.990$ & $0.045$ \\
 \begin{table}[ht]
 \centering\small
 \caption{Sycophancy paired DiD per (family, post-pushback gap $g$),
-using the \emph{reasoning gain} convention:
-\[
-  \mathrm{gain} \;=\; [\mathrm{instr}(\acc{c}-\acc{w})] \;-\; [\mathrm{reas}(\acc{c}-\acc{w})].
-\]
+using the \emph{reasoning gain} convention
+$\mathrm{gain} = \mathrm{instr}(\acc{c}-\acc{w}) - \mathrm{reas}(\acc{c}-\acc{w})$.
 A larger $\acc{c}-\acc{w}$ gap means the model flips more when the user
-pushes against the correct answer—i.e., is \emph{more} sycophantic. So
-\textbf{positive $\mathrm{gain}$ means reasoning has a smaller gap and is
-\emph{less} sycophantic}. The CI is the 95\% bootstrap CI on
-$\mathrm{gain}$ (equivalently, the negated-and-swapped CI on
+pushes against the correct answer (i.e., is \emph{more} sycophantic).
+\textbf{Positive gain therefore means reasoning has a smaller gap and is
+\emph{less} sycophantic.} The CI is the 95\% bootstrap CI on the
+reasoning gain (equivalently, the negated-and-swapped CI on
 $\ndid = \mathrm{reas\_gap} - \mathrm{instr\_gap}$). Preregistered effect
-threshold: $|\mathrm{gain}| \geq 0.10$. BH-$q$ is adjusted across the four
-pooled-per-family tests at FDR$=0.05$.}
+threshold $|\mathrm{gain}| \geq 0.10$; BH-$q$ adjusted across the four
+pooled-per-family tests at FDR $= 0.05$.}
 \label{tab:syc:did}
 \begin{tabular}{lrrrrrrr}
 \toprule

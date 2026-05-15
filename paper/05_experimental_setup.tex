@@ -73,7 +73,7 @@ tokens reproducibly returned a populated \texttt{content} field on the
 same prompts. (ii)~\textbf{the V4-family-native parameter is not
 honoured for the legacy \texttt{reasoning} keyword.}\ The DeepSeek
 documentation states explicitly that the V4 family uses
-\texttt{thinking: \{type: "enabled"\|"disabled"\}}; the legacy
+\texttt{thinking: \{type: "enabled"\}}/\texttt{"disabled"}; the legacy
 \texttt{reasoning: \{enabled: bool\}} is silently ignored. Empirically
 we verified this on a controlled prompt: V4-pro responses with
 \texttt{reasoning: \{enabled: false\}} continued to emit non-zero

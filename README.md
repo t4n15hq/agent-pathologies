@@ -1,242 +1,280 @@
 # agent-pathologies
 
-A controlled, multi-model framework for measuring **trajectory pathologies**
-in multi-turn LLM agents — specifically comparing reasoning-tuned models
-against their instruct-tuned siblings within each family (Pivot A; see
-`RELATED_WORK.md` for prior-work analysis and `PREREGISTRATION.md` for the
-locked hypotheses).
+A preregistered empirical study of how **reasoning-enabled variants** of
+large language models differ from their **instruct-tuned siblings** on
+three multi-turn pathology axes: self-consistency, sycophancy, and
+context rot. Four within-family pairs (two within-MODEL reasoning
+toggles on DeepSeek V4-pro and V4-flash, two cross-SKU pairs on Qwen3
+families) are tested under matched paired sweeps with frozen hypotheses,
+analysis plan, exclusion classes, and effect-size thresholds.
 
-| Experiment | Task (chosen for difficulty headroom) | Hypothesis (paired, two-sided) |
-|---|---|---|
-| `self_consistency` | **Hard arithmetic (hardness 3)** — 7 operands incl. integer division. Frontier models don't saturate. | Within a family, instruct vs reasoning answer-divergence at T=0 differs. **Noise floor for the other two.** |
-| `context_rot` | **Variable tracking** — multi-turn arithmetic state updates. Probe requires actually maintaining state through N turns. | Within a family, instruct vs reasoning accuracy on the final state differs across the filler-turn × kind sweep. |
-| `sycophancy` | **Counterintuitive math (CRT)** — bat-and-ball, lily pad, widget machines. Pushback asserts the **intuitive wrong answer**, not a generic perturbation — maximum sycophancy signal. | Within a family, instruct vs reasoning accuracy at re-probe after pushback differs across the gap × condition sweep. |
+The paper draft, figures, preregistration log, and per-trajectory data
+all live in this repository. The full preprint is in
+[`paper/`](paper/); the reproducibility pointers are at the bottom of
+this README.
 
-All tasks are pluggable via `configs/pivot_a.yaml` → `task:` field (registry in
-`src/agent_pathologies/tasks/__init__.py`). Available: `arithmetic`,
-`multi_fact_needle`, `counterintuitive`, `variable_tracking`, `code_trace`,
-`closed_qa`, `needle`.
+---
 
-## Pivot — what's locked
+## Research question
 
-This is **Pivot A** (within-family instruct ↔ reasoning comparison) — chosen
-because the original "measure these pathologies cleanly" framing turned out
-to be heavily covered by 2025 papers (SYCON, SycEval, "LLMs Get Lost in
-Multi-Turn", non-determinism work — full table in `RELATED_WORK.md`). Pivot A
-keeps the same testbed but compares across post-training regimes. The viable
-novelty is the controlled **multi-axis** pathology profile, not sycophancy
-alone.
+Multi-turn LLM "pathologies" — *self-consistency drift* (the model gives
+different answers across identical replays), *sycophancy* (it caves to
+wrong-pushback from the user), and *context rot* (its accuracy degrades
+as conversations get longer) — have each been documented in isolation
+by prior work. The reading market has converged on a vague claim that
+reasoning-tuned models are "more robust" than instruct-tuned ones on
+these failure modes. But the evidence base is heterogeneous: it
+compares across model families, scales, training runs, RLHF recipes,
+and serving stacks, conflating the reasoning-mode contrast with every
+other dimension.
 
-Hypotheses, primary metric, effect-size threshold, multiple-comparisons plan,
-and exclusion rules are frozen in `PREREGISTRATION.md` (root) and
-`experiments/<axis>/PREREGISTRATION.md` (per experiment). **Do not amend
-these after looking at the data.**
+**Our research question:** Does enabling a model's reasoning mode
+\emph{by itself} change its multi-turn pathology resistance, when
+everything else (base weights, scale, serving host) is held constant?
 
-## Model pairs under test
+## Why this matters
 
-Defined in `configs/models.yaml`. **Within-MODEL reasoning toggle**
-(DeepSeek; the strongest controlled contrast) and **within-FAMILY
-SKU** (Qwen; matched scale, different post-training):
+A "reasoning helps everywhere" claim would let practitioners
+default-deploy reasoning variants for any multi-turn application that
+exposes pathology risk (customer support, agents, evals, judgment).
+A "reasoning helps selectively" claim says the opposite: practitioners
+need to test their *specific* axis before reaching for it.
 
-| Family | Instruct | Reasoning | Pair design |
+## The thesis
+
+After data collection and analysis, the thesis we defend is the
+selective-intervention reading:
+
+> Reasoning enablement is a **selective** intervention. It reliably
+> and substantially improves hard single-shot inference. Its effect on
+> multi-turn pathology resistance is heterogeneous — sometimes large,
+> sometimes null, depending on whether the instruct sibling has
+> inference headroom for the reasoning mode to exploit.
+
+## The three failure modes we tested
+
+1. **Self-consistency.** Hardness-5 arithmetic, 25 replays at $T=0$
+   per task per model. The pathology is the model giving \emph{different}
+   answers across identical replays (or worse, the same wrong answer
+   each time — capability mode-collapse). Measured as accuracy and as
+   the divergence of the integer extracted from each replay.
+
+2. **Sycophancy.** The model answers a hardness-5 arithmetic problem,
+   the user pushes back with one of three messages (\textsc{wrong}: an
+   incorrect answer asserted as correct; \textsc{correct}: the actual
+   correct answer asserted as the user's preferred answer;
+   \textsc{neutral}: ambiguous), then after a gap of filler turns the
+   model is re-asked the original question. The pathology is the model
+   flipping toward whatever the user pushed. Measured as the
+   difference-in-differences:
+   $\text{gain} = \text{instr}(\text{acc\_correct} - \text{acc\_wrong}) - \text{reas}(\text{acc\_correct} - \text{acc\_wrong})$;
+   positive means reasoning is less sycophantic.
+
+3. **Context rot.** A 20-update variable-tracking task. Between the
+   setup and the probe the model receives $k \in \{0, 2, 5, 10, 20, 40\}$
+   filler turn-pairs of one of four kinds (irrelevant /
+   topically-related / token-matched / collapsed). The pathology is
+   accuracy degrading as $k$ grows. Measured as paired accuracy at
+   each $(k, \text{kind})$ cell.
+
+## Model pairs
+
+| Family | Pair design | Instruct member | Reasoning member |
 |---|---|---|---|
-| `deepseek-v4-pro`   | `deepseek-v4-pro` (`reasoning: enabled=false`) | `deepseek-v4-pro` (`reasoning: effort=high`) | within-MODEL toggle |
-| `deepseek-v4-flash` | `deepseek-chat` (legacy alias)                 | `deepseek-reasoner` (legacy alias)            | within-MODEL toggle |
-| `qwen3-235b`        | `qwen/qwen3-235b-a22b-2507`                    | `qwen/qwen3-235b-a22b-thinking-2507`          | within-FAMILY SKU   |
-| `qwen3-30b`         | `qwen/qwen3-30b-a3b-instruct-2507`             | `qwen/qwen3-30b-a3b-thinking-2507`            | within-FAMILY SKU   |
+| DeepSeek V4-pro   | **within-MODEL** (same weights, runtime toggle) | `deepseek-v4-pro` (`reasoning: enabled=false`)     | `deepseek-v4-pro` (`reasoning: effort=high`) |
+| DeepSeek V4-flash | **within-MODEL** (same weights, alias toggle)   | `deepseek-chat` (alias)                            | `deepseek-reasoner` (alias)                  |
+| Qwen3-235B (a22b) | within-FAMILY SKU (matched scale, separate post-training) | `qwen/qwen3-235b-a22b-2507`         | `qwen/qwen3-235b-a22b-thinking-2507`         |
+| Qwen3-30B (a3b)   | within-FAMILY SKU (matched scale, separate post-training) | `qwen/qwen3-30b-a3b-instruct-2507`   | `qwen/qwen3-30b-a3b-thinking-2507`           |
 
-DeepSeek pairs hold base weights, scale, and serving host fixed across
-siblings; the only varying parameter is the reasoning toggle. Qwen
-pairs match scale only, and the instruct and thinking SKUs default to
-different OR upstream hosts (a soft caveat carried through the paper).
-The DeepSeek pairs are the load-bearing evidence; the Qwen pairs
-corroborate the direction with the capability-mode-collapse caveat
-discussed in `paper/07_discussion.tex`.
+The DeepSeek pairs are the load-bearing evidence: base weights, scale,
+and serving host are identical across siblings, so the within-pair
+delta is uniquely attributable to the reasoning toggle. The Qwen pairs
+corroborate the direction with a known capability confound (see
+caveats) — the Qwen instruct SKUs mode-collapse on hardness-5
+arithmetic, which inflates the Qwen sycophancy gap.
 
-**V4-pro routing amendment (2026-05-15):** the original sweep pinned
-V4-pro to OpenRouter/Novita; per the dated amendment, cells that
-returned `provider_error` or empty content on OR were re-attempted
-through the DeepSeek first-party API with the V4-family-native
-`thinking: {type: ...}` parameter. The analyzable dataset is therefore
-mixed: OR/Novita originals where they succeeded plus DS-direct
-recoveries on the cells where they did not. See
-`PREREGISTRATION.md` amendment log and
-`paper/05_experimental_setup.tex` §5.2 for the full disclosure.
+## Preregistration and amendment timeline
 
-All OpenRouter requests are **pinned to a single upstream host per model**
-(`configs/models.yaml: upstream_provider`, `allow_fallbacks: false`). A
-trajectory served by a fallback upstream is excluded per
-`PREREGISTRATION.md §6.4`. Verify the pinned-host names against
-`https://openrouter.ai/<model>/providers` before the real sweep.
+The hypotheses, primary metrics, effect-size threshold (Cohen's
+$h \geq 0.20$ or $|\text{DiD gain}| \geq 0.10$), multiple-comparisons
+correction (Benjamini–Hochberg at FDR $= 0.05$), exclusion classes,
+sample sizes, and falsification criteria were locked in
+`PREREGISTRATION.md` on **2026-05-13**, before any real-model trajectory
+was collected. The amendment log records every change made afterward,
+each dated, each with the reason:
 
-Plus `anthropic/claude-opus-4.7` as a closed-frontier *anchor* — reported as
-a separate column for context only, not part of the paired tests.
+| Date | Amendment | Why |
+|---|---|---|
+| 2026-05-13 (locked) | Initial preregistration | — |
+| 2026-05-13 (same day) | DeepSeek pair redesigned to within-MODEL reasoning toggle (V4-pro vs V4-pro, V4-flash vs V4-flash); OR upstream pinning + `provider_error` re-attempt rules | Original cross-architecture pair (V4-pro vs R1-0528) violated the "scale held constant" premise |
+| 2026-05-14 | New exclusion class `provider_empty_response` for output\_tokens=0 with empty body | Stage-1 calibration found 1,100 such rows; conflated with `empty_probe_answer` |
+| 2026-05-14 | `cell_key` resumability bug fix: include `model_role` so V4-pro instruct and reasoning don't collide | Same model ID for both V4-pro members; resume logic was skipping new reasoning attempts |
+| 2026-05-15 | `max_tokens` recovery: 2048 → 8192 for affected reasoning calls, 16384 for context-rot reasoning; client adds `reasoning_content`/`reasoning_details` fallback parsing | Original 2048 was 16× below DeepSeek's recommended 32K default; reasoning models consumed the entire budget on CoT, leaving zero tokens for `content` |
+| 2026-05-15 | V4-pro routing: cells that returned `provider_error` or empty body on OR/Novita were re-attempted via DeepSeek's first-party API with the V4-family-native `thinking: {type: ...}` parameter | The legacy `reasoning: {enabled: bool}` parameter is silently ignored for `deepseek-v4-pro`; live testing showed `thinking: disabled` actually disables CoT |
+| 2026-05-15 | Qwen instruct `truncated_at_max_tokens` retry at 8192 | 38 Qwen instruct cells emitted longer-than-2048-token CoT on hardness-5 |
+| 2026-05-15 | Semantic dedup pipeline keyed on (`model_family`, role, task, sweep, seed) | Same logical cell served by OR-original and DS-direct retry was being counted twice; dedup picks the latest non-excluded |
+| 2026-05-15 | Removed the planned §7.4 "serving-stack signal" discussion subsection on `provider_empty_response`; reframed as a configuration error | Root-caused to our `max_tokens` setting, not a model property |
 
-## Quickstart
+The first sweep on 2026-05-14 surfaced enough irregularities that we
+treated 2026-05-15 as a recovery day. Every amendment is documented in
+`PREREGISTRATION.md` with the specific reason and the analytical
+consequence. The amendments collectively did not change the
+preregistered hypotheses, only the data quality on the original
+preregistered cells.
 
-```bash
-cd ~/agent-pathologies
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env       # put OPENROUTER_API_KEY=sk-or-... here
+## What changed during the study, and why
 
-# 1) Smoke test against the mock provider — no API, no keys.
-bash scripts/run_sweep.sh --mock
+The most material change was the `max_tokens` configuration error
+discovered on 2026-05-15. Our initial sweep used `max_tokens = 2048`,
+which our calibration justified as "headroom for reasoning traces."
+That choice was wrong: DeepSeek's own documentation specifies a
+default of 32K for `deepseek-reasoner`, and on hardness-5 arithmetic
+the reasoning models consumed the entire 2048-token budget on the CoT
+field, leaving zero tokens for the user-facing answer. Roughly 1,800
+trajectories were affected, concentrated on DeepSeek reasoning
+members.
 
-# 2) Dry-run cost estimate — see the bill before running.
-python scripts/estimate_cost.py
+Once we identified the cause, we re-attempted the affected cells with
+`max_tokens = 8192` (self-consistency, sycophancy) or `16384`
+(context-rot, whose conversation prefixes are longer). The recoveries
+went through DeepSeek's first-party API, partly because it costs less
+than OpenRouter for V4-pro (75% promotional discount) and partly
+because it uses the V4-family-native `thinking: {type: ...}` parameter
+which we verified actually toggles reasoning on/off (the legacy
+`reasoning: {enabled: bool}` parameter we initially used is silently
+ignored by `deepseek-v4-pro`). The recoveries succeeded at high rate
+on every targeted class: 38/38 on Qwen instruct truncation, 164/164 on
+V4-pro instruct, 139/139 on the highest-budget DeepSeek-reasoning
+retry pass.
 
-# 3) Real sweep, resumable (re-running skips completed cells).
-bash scripts/run_sweep.sh
+The final analyzable dataset is composed via *semantic dedup*: where a
+logical cell (family, role, task, sweep value, seed) has multiple
+attempts in the raw JSONL, the dedup logic prefers any non-excluded
+attempt over any excluded attempt, ties broken by recency. The raw
+JSONL keeps every attempt for audit; the analyzable set keeps exactly
+one row per logical cell.
 
-# 4) Cross-experiment paired headline.
-python scripts/pair_analysis.py
-```
+After the amendments and recoveries, every (family × role × axis) cell
+is at its preregistered $N$ in the analyzable set: $1{,}000$ replays per
+cell on self-consistency, $600$ on sycophancy, $1{,}200$ on context-rot.
+Totals: $8{,}000 / 4{,}800 / 9{,}600$ analyzable trajectories per axis.
 
-**Actual sweep cost (Chinese open-weight pairs only, no Claude anchor):
-~$170 USD** — OpenRouter ~$155 (Qwen pairs + V4-pro originals + ConnectError
-storm retries), DeepSeek-direct ~$15 (V4-flash + V4-pro DS-direct
-recoveries). The dominant cost is V4-pro and Qwen3-235B Thinking on OR;
-the V4-pro DS-direct recovery pass cost <$5 because of the 75%
-promotional discount + prompt caching.
-
-## What's rigorous about this
-
-- **Pre-registered.** `PREREGISTRATION.md` locks hypotheses, primary metric,
-  effect-size threshold (Cohen's h ≥ 0.20), multiple-comparisons correction
-  (Benjamini-Hochberg), sample sizes, and stopping rules **before** data
-  collection. Falsification criteria are explicit.
-- **Paired by design.** Same `task_seed` is run on both instruct and
-  reasoning members of each pair. Comparison uses **McNemar's exact** test
-  on paired binary outcomes per cell, plus bootstrap CIs on proportions.
-- **Strict scoring.** No LLM-judge anywhere in the eval loop. Tasks use
-  regex-based answer extraction with word-boundary matching, so an
-  arithmetic answer of "8" does not falsely match the operand "8" copied
-  back into a model's response.
-- **Control conditions.**
-  - `context_rot.kind = token_matched` controls generated/freeform filler
-    content with fixed filler transcripts at the same turn counts.
-  - `sycophancy.condition = correct` + `= neutral` isolate generic
-    capitulation from wrong-belief adoption — the interpretable signal is
-    `acc(correct) − acc(wrong)`.
-- **Exclusions, not silent re-sampling.** Frozen rules in
-  `src/agent_pathologies/analysis/exclusions.py` flag refusals, truncation,
-  unscorable answers. Counts reported separately; excluded rows are
-  excluded from hypothesis testing.
-- **Resumable runs.** Re-running any experiment after a crash skips cells
-  already in the JSONL log (`extra.cell_key`). Mid-sweep failures are cheap.
-- **Token + cost tracking.** Every trajectory carries `input_tokens`,
-  `output_tokens`, `cost_usd`. `scripts/estimate_cost.py` projects total
-  spend before you run.
-- **51 unit tests** covering scoring, synthesizers, statistical helpers, and
-  runner resumability. Run with `python -m pytest tests/`.
-
-## Repo layout
-
-```
-configs/
-  models.yaml                   # within-family pairs + anchor
-  pivot_a.yaml                  # sweep parameters (n_tasks, sweeps, thresholds)
-
-src/agent_pathologies/
-  types.py                      # Trajectory, Turn, ModelRole (pydantic)
-  client.py                     # Multi-provider async client (mock|openrouter|...)
-  runner.py                     # Resumable trajectory executor + cost tracking
-  budget.py                     # Token counting + cost estimation
-  config_loader.py              # YAML → RunSpec iterator
-  tasks/
-    base.py                     # Task + TaskInstance with scorer callable
-    scoring.py                  # Strict answer extraction
-    arithmetic.py
-    needle_qa.py                # Single-fact needle
-    multi_fact_needle.py        # N facts planted, one probed
-    variable_tracking.py        # running-state task for context_rot
-    counterintuitive_math.py    # CRT-style task for sycophancy
-    code_trace.py               # harder optional code-tracing task
-    closed_qa.py                # Multiple-choice factual QA (for follow-ups)
-  conversation/
-    synthesizer.py              # 4 filler kinds incl. token_matched control
-    pushback.py                 # 3 pushback conditions: wrong/correct/neutral
-  analysis/
-    metrics.py                  # accuracy_with_ci, divergence, exclusion report
-    stats.py                    # McNemar, Cohen's h, bootstrap, BH correction
-    plots.py                    # paired bars, accuracy curves w/ CIs
-    exclusions.py               # frozen exclusion rules
-
-experiments/<axis>/
-  run.py                        # config-driven, resumable, paired
-  analyze.py                    # paired McNemar / Wilcoxon + BH + plots
-  PREREGISTRATION.md            # locked hypothesis + plan
-  README.md
-
-scripts/
-  run_sweep.sh                  # one-shot full sweep + analyze
-  estimate_cost.py              # dry-run cost projection
-  pair_analysis.py              # cross-experiment headline table
-
-tests/                          # 51 unit tests, pytest
-data/                           # JSONL trajectories + analysis CSVs + PNG plots
-```
-
-## Reproducing a finding from scratch
-
-```bash
-# A specific finding, e.g. "qwen3-235b reasoning beats instruct on context_rot at k=20":
-python experiments/context_rot/run.py
-python experiments/context_rot/analyze.py
-# Result lives in data/context_rot.jsonl (raw) and data/context_rot_paired.csv
-# (paired McNemar + Cohen's h + BH-corrected q per cell).
-```
-
-Trajectories are persisted in JSONL with `cell_key` hashes; analysis is
-deterministic given the data; randomness in bootstrap CIs is seeded.
-
-## Status
-
-| Component | Status |
-|---|---|
-| Pre-registration locked + amendment log | done |
-| Multi-provider client (OpenRouter, DeepSeek-direct, Anthropic, ...) | done |
-| Tasks (arithmetic, variable-tracking, counterintuitive-math, ...) | done |
-| Control conditions (filler kinds + pushback conditions) | done |
-| Resumable runner + token/cost tracking | done |
-| Paired statistical analysis (McNemar, Wilcoxon, paired DiD, bootstrap, BH) | done |
-| Semantic dedup pipeline (`metrics.dedupe_to_latest`) | done |
-| Per-experiment pre-registrations | done |
-| Unit tests (63) | done |
-| **Real-model sweep collected** (~22,400 analyzable trajectories) | **done** |
-| **Paper draft** (10 sections, 7 figures, full results) | **done** |
-
-### Final coverage
-
-After the 2026-05-15 amendments (cell-key fix, `max_tokens` recovery,
-V4-pro routing via DeepSeek-direct, Qwen `truncated_at_max_tokens` retry,
-semantic dedup), every (family × role × axis) cell is fully analyzable
-at its preregistered $N$:
-
-- Self-consistency: 8,000 / 8,000 (100%)
-- Sycophancy: 4,800 / 4,800 (100%)
-- Context-rot: 9,600 / 9,600 (100%)
-
-Total project cost: ~$170 USD (OpenRouter ~$155, DeepSeek-direct ~$15).
-See `PREREGISTRATION.md` for the full amendment log and
-`data/preliminary_findings.md` for the post-retry confirmed findings
-(F-01: reasoning massively improves single-shot reliability;
-F-02: the empty-response phenomenon was a config error, not a model
-signal).
-
-### Headline results
+## Final results at a high level
 
 | Axis | Direction | Magnitude |
 |---|---|---|
-| Self-consistency (accuracy) | reasoning >> instruct, ALL 4 families | $\Delta_{\mathrm{acc}}$ +0.67 to +0.99, BH-$q$ < $10^{-11}$ everywhere |
-| Sycophancy (reasoning-gain) | heterogeneous within reasoning-enabled variants | V4-flash +0.165 (PASS), V4-pro +0.045 (null at $\geq 0.10$), Qwen pairs +0.85 (capability-confounded) |
-| Context-rot (accuracy) | ceiling-dominated on DeepSeek, positive on Qwen | DeepSeek $\Delta \approx 0$ (instruct at 1.000), Qwen-30B +0.46 (capability-confounded) |
+| **Self-consistency** | reasoning $\gg$ instruct, **all four** families | $\Delta_{\text{acc}}$ ranges from $+0.67$ on V4-flash to $+0.99$ on Qwen-30B; sign-test BH-$q < 10^{-11}$ in every family; per-task wins 38/40, 40/40, 40/40, 40/40 |
+| **Sycophancy (reasoning gain)** | **heterogeneous within reasoning-enabled variants** | V4-flash $+0.165$ (PASS); **V4-pro $+0.045$ (NULL** at the preregistered threshold, CI $[-0.06, +0.15]$); Qwen pairs $+0.85$ (capability-confounded) |
+| **Context rot (accuracy at $k{=}40$)** | ceiling-dominated on DeepSeek, large but confounded on Qwen | DeepSeek $\Delta \approx 0$ (instruct already at $1.000$); Qwen-30B $+0.46$ (capability-confounded) |
 
-We interpret this as: **reasoning enablement is a selective
-intervention** — it amplifies the inference component of a task, so it
-helps reliably wherever the instruct sibling has inference headroom and
-confers no measurable additional benefit when the instruct sibling is
-already at ceiling. See `paper/07_discussion.tex` for the full
-interpretation.
-| Mechanistic interp follow-up (Pivot B) | future paper |
+The headline pattern is that reasoning enablement is a selective lever:
+it reliably and substantially improves hard single-shot inference
+(self-consistency), and it produces *heterogeneous* effects on
+multi-turn pathology resistance — large where the instruct sibling has
+inference headroom, null where the instruct sibling is already
+ceilinged.
+
+## Caveats and what the paper does \emph{not} claim
+
+1. **Qwen capability confound.** Both Qwen instruct SKUs mode-collapse
+   on hardness-5 arithmetic, emitting the placeholder integer
+   $1234$ across the bulk of replays and achieving exactly $0.000$
+   accuracy. The reasoning sibling rescues this. So the
+   $+0.85$ sycophancy gain and the $+0.46$ context-rot gain on Qwen
+   look enormous numerically, but they partly measure
+   capability-recovery rather than the within-model reasoning toggle.
+   The paper says explicitly that the *DeepSeek pairs* are the
+   load-bearing evidence for the within-MODEL contrast; the Qwen pairs
+   corroborate the direction with the capability caveat.
+
+2. **V4-pro mixed routing.** The original sweep pinned V4-pro to
+   OpenRouter/Novita; the 2026-05-15 amendment re-routed retries
+   through DeepSeek-direct. The final analyzable V4-pro dataset is
+   therefore **mixed**: OR/Novita originals where they succeeded, plus
+   DS-direct recoveries on the cells they did not. Per-axis counts
+   are in `paper/05_experimental_setup.tex` §5.2. The mix is light on
+   most axes ($\leq 32$ DS-direct rows out of $1{,}200$ on context-rot
+   reasoning, for example) but is heavier on sycophancy reasoning
+   ($340$ DS-direct out of $600$) precisely because that cell type
+   was most affected by the `max_tokens` bug.
+
+3. **DeepSeek `max_tokens` recovery was a config fix, not a model
+   property.** An earlier draft framed the high `empty_probe_answer`
+   rate on DeepSeek reasoning models as a serving-stack signal. The
+   2026-05-15 amendment retracts that framing — the rate was caused
+   by our own `max_tokens=2048` setting. The discussion subsection on
+   the "serving-stack signal" was removed.
+
+4. **Context-rot DeepSeek ceiling.** Instruct V4-flash and V4-pro both
+   solve the variable-tracking task at $\sim$$1.000$ accuracy across
+   all filler depths, so there is no headroom for reasoning to
+   improve. The within-pair $\Delta$ on DeepSeek context-rot is
+   indistinguishable from zero by construction. We label this honestly
+   as a null mediated by ceiling, not as a reverse finding.
+
+5. **The paper does not claim** reasoning is universally beneficial,
+   that reasoning has a single "robustness multiplier," or that the
+   findings transfer to other axes (e.g., refusal, jailbreak,
+   long-form coherence) or other model families. We measured what we
+   measured.
+
+## What lives where
+
+- [`paper/`](paper/) — the LaTeX preprint draft (10 sections + abstract
+  + references), the 8 PDF/PNG figures, and `paper/main.pdf` after
+  compilation
+- [`PREREGISTRATION.md`](PREREGISTRATION.md) — the root preregistration
+  with the dated amendment log
+- [`experiments/<axis>/PREREGISTRATION.md`](experiments/) — per-axis
+  preregistration documents
+- [`data/preliminary_findings.md`](data/preliminary_findings.md) — the
+  research log: mid-sweep findings (some now superseded by amendments)
+  and the **Confirmed Findings (post-retry)** section at the top
+- `data/*.jsonl` and `data/*_clean.jsonl` — raw and deduped per-trajectory
+  logs (gitignored due to size; reproduce locally by re-running the
+  sweep, or request the release archive)
+- [`RELATED_WORK.md`](RELATED_WORK.md) — prior-work analysis (SYCON,
+  SycEval, "LLMs Get Lost in Multi-Turn", non-determinism work) that
+  motivated the Pivot A within-family design
+
+## Reproducibility pointers
+
+For anyone trying to re-run the sweep or recompile the paper:
+
+```bash
+# Environment
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env       # add OPENROUTER_API_KEY and DEEPSEEK_API_KEY
+
+# Mock smoke test (no API calls)
+bash scripts/run_sweep.sh --mock
+
+# Full sweep (resumable; expect ~$220 USD total spend at current OR/DS prices)
+bash scripts/run_sweep.sh
+
+# Produce the cleaned/deduped JSONL the paper figures consume
+python scripts/clean_dataset.py
+
+# Per-axis analyzers + the cross-axis headline CSV
+python experiments/self_consistency/analyze.py
+python experiments/sycophancy/analyze.py
+python experiments/context_rot/analyze.py
+python scripts/pair_analysis.py
+
+# Regenerate the 8 paper figures from the cleaned data
+python scripts/make_paper_figures.py
+
+# Compile the paper (requires tectonic, pdflatex, or latexmk)
+cd paper && tectonic main.tex
+```
+
+63 unit tests cover the runner, scoring, statistical helpers, and the
+dedup pipeline; run with `python -m pytest tests/`. The amendment log
+in `PREREGISTRATION.md` and the per-experiment preregistration
+documents in `experiments/*/PREREGISTRATION.md` are the canonical
+record of what was preregistered, what changed, when, and why.
+
+## License
+
+Code: MIT. Paper and data: CC BY 4.0.

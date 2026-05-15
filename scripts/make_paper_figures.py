@@ -811,7 +811,7 @@ def fig7_cross_axis_summary():
                     fontsize=8.5, color=txt_color, weight="bold")
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.04)
-    cbar.set_label("Reasoning − instruct (positive = reasoning advantage)", fontsize=8)
+    cbar.set_label("Signed effect (positive = reasoning advantage)", fontsize=8)
     cbar.ax.tick_params(labelsize=7)
     ax.set_title("Cross-axis effect-direction summary, per family",
                  loc="left", weight="bold")
