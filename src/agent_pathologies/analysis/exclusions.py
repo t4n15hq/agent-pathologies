@@ -13,6 +13,16 @@ def exclusion_reason(traj: Trajectory, max_tokens: int = 512) -> str | None:
         return f"provider_error:{traj.error[:60]}"
 
     pa = (traj.probe_answer or "").strip()
+
+    # Distinct class: provider returned 200 with no completion tokens at all
+    # (output_tokens == 0 AND empty content). This is the DeepSeek-reasoner /
+    # v4-pro-reasoning empty-body pattern surfaced by the analysis pass — the
+    # request reached the model but came back with nothing. Distinguished from
+    # `empty_probe_answer` (which now means: produced tokens, but they didn't
+    # parse to an answer).
+    if not pa and (traj.output_tokens or 0) == 0:
+        return "provider_empty_response"
+
     if not pa:
         return "empty_probe_answer"
 

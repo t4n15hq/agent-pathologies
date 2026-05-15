@@ -156,8 +156,91 @@ amendment, dated, and require a fresh sweep.
   pricing during this period benefits from a 75% promotional discount on
   V4-pro through 2026-05-31 and provider-side prompt caching that makes
   repeated identical prompts ~free.
+- **2026-05-14:** Clarification of exclusion-rule §6 semantics under
+  resumability. Genuine model-behavior exclusions (refusal_detected,
+  truncated_at_max_tokens, unscorable_answer, upstream_mismatch) continue
+  to count as attempted and are reported as-is — never silently
+  re-sampled. **Infrastructure-only exclusions (`provider_error:*`) are
+  different**: the request never reached the model. On resume these cells
+  are re-attempted, so that a transient HTTP failure or a credit-exhaustion
+  402 cannot permanently corrupt a cell. This treatment was applied after
+  an OpenRouter credit exhaustion during stage 1 produced ~4,100 such
+  exclusions in `context_rot`; they were re-collected on the subsequent
+  resume run.
+- **2026-05-14 (later):** Added a sixth exclusion class
+  `provider_empty_response` to §6, distinguished from `empty_probe_answer`
+  by `output_tokens == 0`. Stage-1 calibration data showed ~1,100 of the
+  originally-labeled `empty_probe_answer` rows were actually cases where
+  the provider returned HTTP 200 with an empty body and zero completion
+  tokens — concentrated on `deepseek-reasoner` (668 rows) and
+  `deepseek-v4-pro reasoning` via Novita (407 rows). These are NOT
+  retried on resume (they appear deterministic; retrying would burn
+  budget without changing outcomes), but they are counted as a distinct
+  exclusion class in the paper so reviewers can see this is a serving-
+  stack phenomenon, not refusals/truncations or scoring failures.
+  Legacy rows tagged `empty_probe_answer` are retroactively reclassified
+  by `analysis/metrics.py::reclassify_legacy_exclusions` at analyzer
+  read-time, idempotently.
 - **2026-05-13 (also):** Staged rollout flag added. The sweep can be run
   in two stages via `--anchors skip` (pairs only) then `--anchors only`
   (anchors only), with resumability ensuring stage 2 only runs new cells.
   This lets the experimenter validate the Chinese open-weight slice and
   observe actual costs before committing the Claude anchor.
+- **2026-05-15 (max\_tokens bug-fix + V4-pro routing change):**
+  Discovered that `max_tokens=2048` (set in `configs/pivot_a.yaml`
+  for all axes) was below the DeepSeek-recommended default for
+  reasoning models. Per the public DeepSeek API docs, the default
+  for `deepseek-reasoner` is 32K and the maximum is 64K; our 2048
+  was 16× too small. On hardness-5 arithmetic the reasoning model
+  consumed the entire 2048-token budget on `reasoning_content`
+  (the CoT field), leaving zero tokens for the final `content`
+  field. The runner recorded these as `empty_probe_answer` or
+  `provider_empty_response` exclusions on DeepSeek V4-flash
+  reasoning (~668/1000 cells on self-consistency) and V4-pro
+  reasoning (~600/1000 cells on self-consistency, similar pattern
+  across other axes).
+  Fixes applied:
+  (a) `src/agent_pathologies/client.py` now reads
+  `reasoning_content` (DeepSeek-direct) or `reasoning` /
+  `reasoning_details` (OpenRouter) as a fallback when `content` is
+  empty, providing defense-in-depth recovery;
+  (b) `scripts/retry_deepseek_empties.py` re-attempts each affected
+  cell with `max_tokens=8192` on the same model+seed+sweep tuple,
+  appending the new row to the existing JSONL (which remains
+  append-only as an audit trail);
+  (c) V4-pro reasoning is rerouted from
+  OpenRouter/Novita to DeepSeek-direct for the retry pass — this
+  exploits the 75\% V4-pro promotional discount and provider-side
+  prompt caching, removes third-party serving variability, and
+  places both members of the V4-pro pair on the model creator's
+  first-party API (the same upstream-consistency principle that
+  motivated the original pinning rule). The retry achieved a 100\%
+  recovery rate on the first 41 cells tested.
+  This was an experimental-configuration error in our setup, not a
+  property of the DeepSeek model or its serving stack. The §6
+  exclusion table reports post-retry effective counts (cells where
+  every attempt for that cell failed); `dedupe_to_latest` in
+  `metrics.py` ensures superseded rows are not double-counted.
+  Discussion section 7.4 (originally planned as a "serving-stack
+  signal" subsection on the empty-response asymmetry) is dropped.
+- **2026-05-14 (resumability bug-fix):** Discovered and fixed a
+  cell-key collision in the resumability mechanism. The original
+  `cell_key()` hashed `(model, task_id, sweep_value, seed)`; for the
+  DeepSeek V4-pro pair, both instruct and reasoning roles use the same
+  model ID (`deepseek/deepseek-v4-pro`) and differ only in the runtime
+  `reasoning_config` parameter, so the two roles' cells could collide.
+  When one role completed a cell, the OTHER role's matching cell would
+  be marked done in the resume set and not re-attempted. **The stored
+  trajectories were unaffected — every row in the JSONL is internally
+  correct, scored against the right answer, and labelled with the right
+  `model_role`. The bug was purely in deciding which NEW cells to
+  attempt.** The fix adds `model_role` to the key derivation and makes
+  `existing_cell_keys` recompute keys from each stored row's fields
+  (rather than reading `extra.cell_key`), so old rows are correctly
+  classified under the new key formula. On the subsequent resume the
+  previously-skipped V4-pro cells are re-attempted; the other six
+  models are unaffected because their model IDs already differed across
+  roles. We document this here because the change affects
+  \emph{which} trajectories appear in the final dataset (more, not
+  fewer; data quality unchanged), and reviewers should see the
+  chronology.

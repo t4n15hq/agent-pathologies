@@ -20,9 +20,41 @@ def _normalize_response(r):
     return str(r), None
 
 
-def cell_key(model: str, task_id: str, sweep_value: Any, seed: int | None) -> str:
+def _role_str(model_role: Any) -> str | None:
+    """Normalize a model_role argument to its canonical string form
+    regardless of whether it arrives as an enum value, an enum instance,
+    or a string. Matters because cell_key is called both with the
+    `ModelRole.INSTRUCT` enum (write time, from run.py) and with the
+    JSON-decoded string `"instruct"` (read time, from existing_cell_keys
+    canonicalizing a stored row)."""
+    if model_role is None:
+        return None
+    val = getattr(model_role, "value", model_role)
+    return str(val)
+
+
+def cell_key(
+    model: str,
+    task_id: str,
+    sweep_value: Any,
+    seed: int | None,
+    model_role: Any = None,
+) -> str:
+    """Compute the resumability key for a single trajectory cell.
+
+    Includes `model_role` so that two siblings sharing the same `model` ID
+    (e.g. DeepSeek V4-pro instruct vs. reasoning, distinguished only by a
+    runtime `reasoning_config` flag) do not collide. Without this, the
+    runner would skip a reasoning cell because the instruct sibling had
+    already written a row with the same (model, task, sweep, seed)."""
     payload = json.dumps(
-        {"model": model, "task": task_id, "sweep": sweep_value, "seed": seed},
+        {
+            "model": model,
+            "model_role": _role_str(model_role),
+            "task": task_id,
+            "sweep": sweep_value,
+            "seed": seed,
+        },
         sort_keys=True,
         default=str,
     )
@@ -33,8 +65,20 @@ def existing_cell_keys(path: Path) -> set[str]:
     """Read a JSONL log and return the set of cell-keys already attempted.
     Used by experiment runners to resume an interrupted sweep.
 
-    Excluded rows still count as attempted: the preregistration commits to
-    reporting exclusions rather than silently re-sampling them on resume.
+    Genuine model-behavior exclusions (refusal, truncation, unscorable,
+    upstream_mismatch) count as attempted and are NOT re-sampled — the
+    preregistration commits to reporting them as-is.
+
+    Infrastructure exclusions (`provider_error:*`) are different: the trajectory
+    never reached the model. We re-attempt those on resume so that a transient
+    HTTP failure or credit-exhaustion 402 doesn't permanently corrupt a cell.
+
+    Cell keys are recomputed from the stored row data (model, model_role,
+    task_id, sweep_value, seed) rather than read from `extra.cell_key`,
+    because rows written before the 2026-05-14 cell-key fix used an
+    insufficient key that did not include `model_role` — V4-pro instruct
+    and reasoning would have collided. Recomputing here disambiguates
+    them retroactively.
     """
     if not path.exists():
         return set()
@@ -48,9 +92,17 @@ def existing_cell_keys(path: Path) -> set[str]:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            key = row.get("extra", {}).get("cell_key")
-            if key:
-                done.add(key)
+            reason = (row.get("exclusion_reason") or "")
+            if reason.startswith("provider_error:"):
+                continue  # re-attempt this cell — it never reached the model
+            recomputed = cell_key(
+                model=row.get("model"),
+                task_id=row.get("task_id"),
+                sweep_value=row.get("sweep_value"),
+                seed=row.get("seed"),
+                model_role=row.get("model_role"),
+            )
+            done.add(recomputed)
     return done
 
 
@@ -143,7 +195,7 @@ async def run_trajectory(
         error=error,
         sweep_value=sweep_value,
         extra={
-            "cell_key": cell_key(client.model, task_id, sweep_value, seed),
+            "cell_key": cell_key(client.model, task_id, sweep_value, seed, model_role=model_role),
             "upstream_pinned": upstream_pinned,
             "upstream_actual": upstream_actuals[-1] if upstream_actuals else None,
             "upstream_observed_all": upstream_actuals,

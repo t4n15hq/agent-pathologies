@@ -1,26 +1,57 @@
-# Within-family pairs for Pivot A. Two design patterns:
-#
-#   1. Within-MODEL reasoning toggle (DeepSeek V4 family). The SAME model
-#      is called twice — once with `reasoning: {enabled: false}` (instruct)
-#      and once with `reasoning: {effort: high}` (reasoning). Identical
-#      weights, scale, base training, and serving host (pinned upstream);
-#      only the runtime reasoning flag differs.
-#   2. Within-FAMILY SKU pair (Qwen3). Alibaba ships separate instruct and
-#      thinking SKUs for the same base family.
-#
-# OpenRouter upstream_provider names below are pinned defaults that have
-# been verified to (a) accept our reasoning toggle, (b) return the actual
-# upstream in the response so exclusion rule §6.4 can verify it. Pricing
-# snapshots from 2026-05-13; refresh before re-running.
-#
-# Why not DeepSeek direct: DeepSeek direct's v4-pro endpoint silently
-# ignores `reasoning: {enabled: false}` — only v4-flash supports the toggle
-# (via legacy `deepseek-chat`/`deepseek-reasoner` aliases). Using OpenRouter
-# for both gives uniform behavior; we lose DeepSeek's 75% v4-pro promo but
-# gain code-path simplicity and consistent pinning.
+# Within-family pairs for Pivot A. Ordering matters: cheaper pairs first,
+# so if budget runs out we still have the most rows. Resumable design
+# means re-running picks up where any 402 / outage left off.
 
 pairs:
-  # --- DeepSeek V4-pro: within-MODEL reasoning toggle, pinned to Novita ---
+  # --- Qwen3 30b: cheapest, run first ---
+  - family: qwen3-30b
+    base_provider: openrouter
+    instruct:
+      model: qwen/qwen3-30b-a3b-instruct-2507
+      upstream_provider: Nebius
+      price_in_per_m: 0.09
+      price_out_per_m: 0.30
+    reasoning:
+      model: qwen/qwen3-30b-a3b-thinking-2507
+      upstream_provider: AtlasCloud
+      price_in_per_m: 0.08
+      price_out_per_m: 0.40
+
+  # --- Qwen3 235b: medium cost ---
+  - family: qwen3-235b
+    base_provider: openrouter
+    instruct:
+      model: qwen/qwen3-235b-a22b-2507
+      upstream_provider: Novita
+      price_in_per_m: 0.07
+      price_out_per_m: 0.10
+    reasoning:
+      model: qwen/qwen3-235b-a22b-thinking-2507
+      upstream_provider: Alibaba
+      price_in_per_m: 0.15
+      price_out_per_m: 1.50
+
+  # --- DeepSeek V4-flash: cheap via DeepSeek direct ---
+  - family: deepseek-v4-flash
+    base_provider: deepseek_direct
+    instruct:
+      model: deepseek-chat
+      price_in_per_m: 0.14
+      price_out_per_m: 0.28
+    reasoning:
+      model: deepseek-reasoner
+      price_in_per_m: 0.14
+      price_out_per_m: 0.28
+
+  # --- DeepSeek V4-pro: most expensive, run last so budget bottlenecks here.
+  # NOTE (2026-05-15 PREREGISTRATION amendment): the routing here is the
+  # ORIGINAL sweep configuration. All V4-pro retries (and the rows that
+  # compose the final analyzable dataset) instead route through
+  # api.deepseek.com with model="deepseek-v4-pro" and the V4-family-native
+  # `thinking: {type: "enabled"|"disabled"}` parameter. The OR/Novita
+  # configuration below is preserved for reproducibility of the original
+  # sweep; the retry pipeline (`scripts/retry_v4pro_*.py`) hardcodes the
+  # DS-direct route. See paper §sec:methods:v4pro-routing.
   - family: deepseek-v4-pro
     base_provider: openrouter
     instruct:
@@ -36,52 +67,8 @@ pairs:
       price_in_per_m: 0.43
       price_out_per_m: 0.87
 
-  # --- DeepSeek V4-flash: within-MODEL toggle, pinned to DeepInfra ---
-  - family: deepseek-v4-flash
-    base_provider: openrouter
-    instruct:
-      model: deepseek/deepseek-v4-flash
-      upstream_provider: DeepInfra
-      reasoning_config: {enabled: false}
-      price_in_per_m: 0.14
-      price_out_per_m: 0.28
-    reasoning:
-      model: deepseek/deepseek-v4-flash
-      upstream_provider: DeepInfra
-      reasoning_config: {effort: "high"}
-      price_in_per_m: 0.14
-      price_out_per_m: 0.28
-
-  # --- Qwen3 235b: SKU pair, pinned to discovered defaults ---
-  - family: qwen3-235b
-    base_provider: openrouter
-    instruct:
-      model: qwen/qwen3-235b-a22b-2507
-      upstream_provider: Novita
-      price_in_per_m: 0.07
-      price_out_per_m: 0.10
-    reasoning:
-      model: qwen/qwen3-235b-a22b-thinking-2507
-      upstream_provider: Alibaba
-      price_in_per_m: 0.15
-      price_out_per_m: 1.50
-
-  # --- Qwen3 30b: SKU pair ---
-  - family: qwen3-30b
-    base_provider: openrouter
-    instruct:
-      model: qwen/qwen3-30b-a3b-instruct-2507
-      upstream_provider: Nebius
-      price_in_per_m: 0.09
-      price_out_per_m: 0.30
-    reasoning:
-      model: qwen/qwen3-30b-a3b-thinking-2507
-      upstream_provider: AtlasCloud
-      price_in_per_m: 0.08
-      price_out_per_m: 0.40
-
-# Closed-frontier anchor — context only, not in paired tests.
-# Stage 2: enable with `--anchors only` after stage 1 cost is reviewed.
+# Stage 2 anchor (Claude Opus 4.7) — only run with --anchors only after
+# stage 1 is complete and credit balance is confirmed.
 anchors:
   - family: claude-4.7
     instruct:

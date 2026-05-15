@@ -197,6 +197,7 @@ class OpenAICompatibleClient(LLMClient):
         timeout: float = 120.0,
         upstream_provider: str | None = None,
         reasoning_config: dict[str, Any] | None = None,
+        thinking_config: dict[str, Any] | None = None,
     ) -> None:
         self.model = model
         self.provider = provider
@@ -204,24 +205,44 @@ class OpenAICompatibleClient(LLMClient):
         self.api_key = api_key or ""
         self.upstream_provider = upstream_provider
         self.reasoning_config = reasoning_config
+        # `thinking_config` is DeepSeek-direct's NATIVE toggle for the new
+        # `deepseek-v4-flash` / `deepseek-v4-pro` model IDs. Per
+        # https://api-docs.deepseek.com/api/create-chat-completion, the V4
+        # family accepts `thinking: {"type": "enabled"|"disabled"}`. The
+        # legacy `reasoning: {"enabled": bool}` format is silently ignored
+        # for these IDs (the 2026-05-15 max_tokens diagnostic showed the
+        # model defaults to thinking-mode-on regardless of `reasoning`
+        # being set to false). For V4-pro instruct calls we MUST send
+        # `thinking: {"type": "disabled"}` to actually disable CoT.
+        self.thinking_config = thinking_config
         self._http = httpx.AsyncClient(timeout=timeout)
 
     def _inject_reasoning(self, payload: dict[str, Any]) -> None:
         """Provider-specific reasoning-toggle injection.
 
-        deepseek_direct accepts `reasoning` (per https://api-docs.deepseek.com).
-        openrouter accepts `reasoning` (per https://openrouter.ai/docs/api-reference/parameters).
-        Both honor:
-          { "enabled": bool, "effort": "low|medium|high" }
-        We pass our config through verbatim; absence means "provider default"."""
-        cfg = self.reasoning_config
-        if not cfg:
-            return
-        if self.provider in ("openrouter", "deepseek_direct"):
-            payload["reasoning"] = dict(cfg)
+        Two formats are supported, controlled by which config was passed:
+          - `reasoning_config` → `payload["reasoning"] = {...}` (legacy
+            DeepSeek alias models, OpenRouter normalized format).
+          - `thinking_config` → `payload["thinking"] = {...}` (DeepSeek-direct
+            V4-family native format; required when calling
+            `deepseek-v4-flash` / `deepseek-v4-pro` directly).
+        Both are injected if both are set, in that order, so providers that
+        only recognize one format silently ignore the other."""
+        if self.reasoning_config and self.provider in ("openrouter", "deepseek_direct"):
+            payload["reasoning"] = dict(self.reasoning_config)
+        if self.thinking_config and self.provider == "deepseek_direct":
+            payload["thinking"] = dict(self.thinking_config)
 
-    @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, min=2, max=30))
+    @retry(stop=stop_after_attempt(8), wait=wait_exponential(multiplier=2, min=2, max=120))
     async def complete(self, messages, temperature=0.0, max_tokens=1024, seed=None):
+        # 8 attempts × exponential backoff (2, 4, 8, 16, 32, 64, 120, 120 s) gives
+        # ~6 minutes of total backoff before we surrender — long enough to ride
+        # out an OpenRouter micro-storm (the 2026-05-14/15 ConnectError + 402
+        # storms were typically 30-180s windows). Previously 4 attempts with
+        # 30s max wait surrendered too quickly and yielded ~40% provider_error
+        # rates on context_rot during stormy periods. Failures here are still
+        # written as provider_error (retry-eligible) so a transient outage
+        # never permanently corrupts a cell.
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -244,7 +265,28 @@ class OpenAICompatibleClient(LLMClient):
         )
         r.raise_for_status()
         data = r.json()
-        text = data["choices"][0]["message"]["content"] or ""
+        msg = data["choices"][0]["message"]
+        text = msg.get("content") or ""
+        # Reasoning-model fallback. DeepSeek-direct's `deepseek-reasoner` returns
+        # `reasoning_content` (CoT) and `content` (final answer) as sibling fields;
+        # OpenRouter returns either `reasoning` (string) or `reasoning_details`
+        # (list of structured blocks) depending on the upstream. When max_tokens
+        # is exhausted by reasoning, `content` can be empty while the answer
+        # (or at least its final sentence) sits at the tail of the reasoning
+        # trace. We fall back to those fields so a clean `is_correct` score can
+        # still be extracted via the scorer's regex. Confirmed empirically on
+        # DeepSeek hardness-5 arithmetic at max_tokens=2048 (see test).
+        if not text.strip():
+            text = (msg.get("reasoning_content")
+                    or msg.get("reasoning")
+                    or "")
+            if not text.strip():
+                details = msg.get("reasoning_details")
+                if isinstance(details, list):
+                    text = " ".join(
+                        d.get("text", "") if isinstance(d, dict) else str(d)
+                        for d in details
+                    )
         # OpenRouter exposes the actual upstream in the response body
         # (`data["provider"]`) and as a header (`x-openrouter-provider`).
         # DeepSeek direct is its own upstream — we record the provider field.
@@ -263,6 +305,7 @@ def get_client(
     *,
     upstream_provider: str | None = None,
     reasoning_config: dict[str, Any] | None = None,
+    thinking_config: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> LLMClient:
     """Provider factory.
@@ -272,7 +315,10 @@ def get_client(
 
     `upstream_provider` is meaningful for OpenRouter only (quietly ignored
     elsewhere). `reasoning_config` is meaningful for OpenRouter and
-    deepseek_direct; it controls the model's reasoning/thinking toggle.
+    deepseek_direct (legacy reasoning toggle). `thinking_config` is
+    DeepSeek-direct's native V4-family toggle and MUST be used for direct
+    calls to `deepseek-v4-flash` / `deepseek-v4-pro`; the legacy `reasoning`
+    parameter is silently ignored for those IDs.
     """
     p = provider.lower()
     if p == "mock":
@@ -285,6 +331,7 @@ def get_client(
             provider="openrouter",
             upstream_provider=upstream_provider,
             reasoning_config=reasoning_config,
+            thinking_config=thinking_config,
             **kwargs,
         )
     if p == "deepseek_direct":
@@ -294,6 +341,7 @@ def get_client(
             api_key=kwargs.pop("api_key", os.environ.get("DEEPSEEK_API_KEY")),
             provider="deepseek_direct",
             reasoning_config=reasoning_config,
+            thinking_config=thinking_config,
             **kwargs,
         )
     if p == "anthropic":

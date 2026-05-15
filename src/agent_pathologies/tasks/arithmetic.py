@@ -17,14 +17,31 @@ class MultiStepArithmetic(Task):
     def __init__(self, hardness: int = 3) -> None:
         # hardness 1: 4 small operands (saturates frontier models)
         # hardness 2: 6 operands
-        # hardness 3 (default): 7 operands incl. integer division and modulo
-        # hardness 4: 9 operands with 3-digit numbers (real headroom)
-        assert hardness in (1, 2, 3, 4)
+        # hardness 3: 7 operands incl. integer division and modulo
+        # hardness 4: 9 operands with 3-digit numbers
+        # hardness 5: 12 operands with 4-digit numbers, exponents, deep nesting
+        assert hardness in (1, 2, 3, 4, 5)
         self.hardness = hardness
 
     def sample(self, seed: int) -> TaskInstance:
         rng = random.Random(seed)
-        if self.hardness == 4:
+        if self.hardness == 5:
+            ns = [rng.randint(1000, 9999) for _ in range(12)]
+            a, b, c, d, e, f, g, h, i, j, k, l = ns
+            # Squares and deep nesting; integer ops only so the answer
+            # is an unambiguous integer. Guard against divide-by-zero.
+            if e == 0: e = 17
+            if h == 0: h = 23
+            if l == 0: l = 31
+            expr = (
+                f"(((((({a} + {b}) ** 2) - ({c} * {d})) // {e}) + "
+                f"(({f} - {g}) ** 2)) % {h}) + (({i} * {j}) // {k}) - {l}"
+            )
+            answer = str(
+                (((((a + b) ** 2) - (c * d)) // e) + ((f - g) ** 2)) % h
+                + (i * j) // k - l
+            )
+        elif self.hardness == 4:
             ns = [rng.randint(100, 999) for _ in range(9)]
             a, b, c, d, e, f, g, h, i = ns
             # ((((a + b) * c) - d) // e + (f * g)) % h + i

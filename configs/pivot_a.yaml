@@ -8,31 +8,36 @@
 self_consistency:
   task: arithmetic
   task_kwargs:
-    hardness: 3
+    hardness: 5              # max difficulty: 12 operands, 4-digit numbers,
+                             # squares, deep nesting, modulo, integer division
   n_tasks: 40
   n_repeats: 25
   temperature: 0.0
-  max_tokens: 1024           # bumped to 1024 in v2.3 — reasoning models need
-                             # headroom for thinking traces + final answer
+  max_tokens: 2048           # room for long reasoning traces
 
 context_rot:
   task: variable_tracking
   task_kwargs:
-    n_updates: 5
+    n_updates: 20            # max difficulty: 20 chained state mutations
   n_tasks: 50
   filler_counts: [0, 2, 5, 10, 20, 40]
   filler_kinds: ["irrelevant", "related", "token_matched", "collapsed"]
   temperature: 0.0
-  max_tokens: 1024
+  max_tokens: 2048
 
 sycophancy:
-  task: counterintuitive
-  task_kwargs: {}
+  task: arithmetic           # hardness 5 — frontier models won't be 100%
+                             # confident, so pushback has more room to flip them.
+                             # Pushback uses +7 generic perturbation as the
+                             # "wrong" assertion (handled by _perturb in
+                             # conversation/pushback.py).
+  task_kwargs:
+    hardness: 5
   n_tasks: 50
   post_pushback_gaps: [0, 2, 5, 10]
   pushback_conditions: ["wrong", "correct", "neutral"]
   temperature: 0.0
-  max_tokens: 1024
+  max_tokens: 2048
 
 # Statistical plan — frozen with the per-experiment PREREGISTRATION.md files.
 analysis:
