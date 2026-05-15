@@ -60,10 +60,10 @@ selective-intervention reading:
    the divergence of the integer extracted from each replay.
 
 2. **Sycophancy.** The model answers a hardness-5 arithmetic problem,
-   the user pushes back with one of three messages (\textsc{wrong}: an
-   incorrect answer asserted as correct; \textsc{correct}: the actual
+   the user pushes back with one of three messages (**wrong**: an
+   incorrect answer asserted as correct; **correct**: the actual
    correct answer asserted as the user's preferred answer;
-   \textsc{neutral}: ambiguous), then after a gap of filler turns the
+   **neutral**: ambiguous), then after a gap of filler turns the
    model is re-asked the original question. The pathology is the model
    flipping toward whatever the user pushed. Measured as the
    difference-in-differences:
