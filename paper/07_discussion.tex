@@ -27,6 +27,18 @@ baseline has room to improve. Hard single-shot reasoning is where the
 benefit is sharpest and most uniform; multi-turn pathology
 resistance breaks into a more mixed picture.
 
+A simple mechanism-level interpretation is that reasoning helps most
+when the observed failure is caused by insufficient inference at the
+probe. In the self-consistency task, and in some pushback settings, the
+model must re-derive a hard integer answer; an explicit reasoning mode
+therefore has a direct path to improving the outcome. In the context-rot
+setting, by contrast, the relevant bottleneck is not always inference:
+the model may already track the state perfectly (the DeepSeek ceiling
+case), or the observed gap may reflect an instruct-side capability
+failure rather than a clean memory intervention (the Qwen case). This
+explains why reasoning can produce a large gain on one axis while
+leaving another axis effectively unchanged.
+
 \subsection{The capability--sycophancy disentanglement}
 \label{sec:discussion:capability}
 

@@ -1,19 +1,6 @@
 \section{Results}
 \label{sec:results}
 
-% ---------- STRUCTURE NOTE ----------
-% Six tables are pre-specified before final data lands; their layouts are
-% sketched below as `\NUM` placeholders. Once `data/*_clean.jsonl` and
-% `pair_analysis.csv` are produced (post-sweep), each `\NUM` is replaced
-% with the corresponding cell value.
-%
-% Order of presentation is deliberately:
-%   (T1) preliminaries (pairs + exclusions; necessary before any numbers
-%        are interpretable);
-%   (T2-T4) self-consistency and sycophancy, the two strong axes;
-%   (T5) context rot, the mixed/weak axis, presented honestly;
-%   (T6) cross-axis pass/fail summary.
-
 \subsection{Preliminaries: pairs, providers, and exclusion accounting}
 \label{sec:results:preliminaries}
 
@@ -66,8 +53,8 @@ this is the within-pair upstream-mismatch caveat (\S\ref{sec:setup}).
 $^\dagger$ V4-pro was originally pinned to OR/Novita; per the 2026-05-15
 amendment, cells that failed on OR were re-attempted via DeepSeek's
 first-party API. The final analyzable V4-pro dataset is therefore
-\emph{mixed} — OR/Novita originals that succeeded plus DS-direct
-recoveries for the cells that did not — with the DS-direct share
+\emph{mixed}---OR/Novita originals that succeeded plus DS-direct
+recoveries for the cells that did not---with the DS-direct share
 heaviest on the reasoning sycophancy cells most affected by the
 \texttt{max\_tokens}{=}2048 bug. Per-axis counts are in
 \S\ref{sec:methods:v4pro-routing}. The \texttt{PREREGISTRATION.md}
@@ -255,7 +242,10 @@ explicitly and ask the reader to weight them accordingly.
 \label{sec:results:contextrot}
 
 Context rot is the most nuanced axis and we present it without
-overclaiming. Table~\ref{tab:ctx:cell} reports the raw per-cell paired
+overclaiming. It is also the least clean axis in the study: the
+DeepSeek pairs are ceiling-bound, while the Qwen gains are partially
+entangled with the same capability gap documented above.
+Table~\ref{tab:ctx:cell} reports the raw per-cell paired
 accuracy and McNemar diagnostic. The pattern that emerged on the
 deepest-sampled pair (V4-flash) during stage-1 collection is a strong
 ceiling effect: the instruct sibling already solves the
@@ -289,7 +279,7 @@ Qwen-30B  & irrelevant     & $40$ & $0.500$ & $0.960$ & $1.168$               & 
 Qwen-30B  & token\_matched & $40$ & $0.420$ & $0.880$ & $1.024$               & $1.4{\times}10^{-4}$ \\
 Qwen-30B  & collapsed      & $40$ & $0.720$ & $0.900$ & $0.472$               & $7.0{\times}10^{-2}$ \\
 % (full $\mathrm{family} \times \mathrm{kind} \times n_{\mathrm{filler}}$
-% sweep — truncated in main text, full table in appendix)
+% sweep---truncated in main text, full table in appendix)
 \bottomrule
 \end{tabular}
 \end{table}
@@ -377,12 +367,3 @@ helps reliably wherever the instruct sibling has inference headroom
 to lose, and confers no measurable additional benefit when the
 instruct sibling is already at ceiling or when the within-pair
 contrast partially confounds capability with sycophancy resistance.
-
-% TODO once data is in:
-%   - replace every \NUM with the corresponding cell value from
-%     pair_analysis.csv and the per-axis paired CSVs.
-%   - drop in PNG figures from paper/figures/ (forest plot, divergence
-%     histograms, decay curves, DiD by family).
-%   - if any axis result contradicts the selective-intervention reading,
-%     rewrite the closing paragraph of this section honestly rather than
-%     reframing post-hoc.

@@ -56,7 +56,7 @@ Multi-turn LLM "pathologies" — *self-consistency drift* (the model gives
 different answers across identical replays), *sycophancy* (it caves to
 wrong-pushback from the user), and *context rot* (its accuracy degrades
 as conversations get longer) — have each been documented in isolation
-by prior work. The reading market has converged on a vague claim that
+by prior work. The literature has converged on a vague claim that
 reasoning-tuned models are "more robust" than instruct-tuned ones on
 these failure modes. But the evidence base is heterogeneous: it
 compares across model families, scales, training runs, RLHF recipes,

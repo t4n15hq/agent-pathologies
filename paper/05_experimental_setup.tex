@@ -178,7 +178,7 @@ The raw JSONL is append-only: every retry attempt writes a new row,
 even when retrying the same logical (model-family, role, task,
 sweep-cell, seed) cell. For the analyzable dataset we apply
 \texttt{dedupe\_to\_latest} (\texttt{src/agent\_pathologies/analysis/metrics.py}),
-which keys cells on \emph{(model-family, role, task, sweep, seed)} —
+which keys cells on \emph{(model-family, role, task, sweep, seed)}---
 intentionally broader than the runner's resume-key, which additionally
 distinguishes by the raw model identifier. This broader key collapses
 rows of the same logical cell that were served by different providers
