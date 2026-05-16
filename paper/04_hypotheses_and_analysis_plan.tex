@@ -64,15 +64,21 @@ their thresholds before a family is called positive.
 (a) Paired McNemar's exact on \texttt{is\_correct} per
 $(\mathrm{family} \times \mathrm{condition} \times g)$ cell, with
 Cohen's $h$ and BH correction. (b) Between-model paired
-difference-in-differences (DiD): for each $(\mathrm{family}, g)$ cell,
-$\ndid = \big[\mathrm{reasoning}(\acc{\mathrm{correct}} -
-\acc{\mathrm{wrong}})\big] - \big[\mathrm{instruct}(\acc{\mathrm{correct}}
-- \acc{\mathrm{wrong}})\big]$, paired by task identity, with bootstrap
-$95\%$ CI from $10{,}000$ resamples
-(\texttt{paired\_did\_bootstrap}). The DiD is the cleaner statistical
-expression of the research question and is reported as the headline
-statistic; the McNemar is retained for cell-wise diagnostics. The
-amendment dated 2026-05-13 promoted the DiD to co-primary.
+difference-in-differences (DiD). For each $(\mathrm{family}, g)$ cell,
+we compute
+\[
+\ndid =
+\big[\mathrm{reasoning}(\acc{\mathrm{correct}} -
+\acc{\mathrm{wrong}})\big]
+-
+\big[\mathrm{instruct}(\acc{\mathrm{correct}} -
+\acc{\mathrm{wrong}})\big],
+\]
+paired by task identity, with bootstrap $95\%$ CI from $10{,}000$
+resamples (\texttt{paired\_did\_bootstrap}). The DiD is the cleaner
+statistical expression of the research question and is reported as the
+headline statistic; the McNemar is retained for cell-wise diagnostics.
+The amendment dated 2026-05-13 promoted the DiD to co-primary.
 
 \subsection{Effect-size thresholds}
 

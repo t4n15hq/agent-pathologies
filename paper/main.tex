@@ -5,6 +5,7 @@
 \usepackage{microtype}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\emergencystretch=3em
 
 % ---------- Math ----------
 \usepackage{amsmath}
@@ -16,6 +17,7 @@
 \usepackage{array}
 \usepackage{tabularx}
 \usepackage{multirow}
+\usepackage[section]{placeins}
 
 % ---------- References ----------
 \usepackage[numbers,sort&compress]{natbib}
@@ -28,6 +30,12 @@
 \usepackage{verbatim}
 
 % ---------- Convenience macros ----------
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{12pt plus 2pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 \newcommand{\acc}[1]{\ensuremath{\mathrm{acc}(#1)}}
 \newcommand{\ndid}{\ensuremath{\Delta\mathrm{DiD}}}
 \newcommand{\cohenh}{\ensuremath{h}}

@@ -14,71 +14,71 @@ from the reasoning member.
 
 \begin{table}[h]
 \centering
-\small
-\begin{tabularx}{\textwidth}{l l l l X}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\textwidth}{@{}p{0.16\textwidth}p{0.23\textwidth}p{0.23\textwidth}Y@{}}
 \toprule
-Family & Role & Model identifier & Upstream & Distinguishing parameter \\
+Family & Instruct member & Reasoning member & Routing / caveat \\
 \midrule
-\multirow{2}{*}{\texttt{deepseek-v4-pro}$^\dagger$}
-  & instruct  & \texttt{deepseek-v4-pro}\,/\,\texttt{deepseek/deepseek-v4-pro} & DS-direct\,/\,Novita & \texttt{thinking: \{type: "disabled"\}} (DS), \texttt{reasoning: \{enabled: false\}} (OR) \\
-  & reasoning & \texttt{deepseek-v4-pro}\,/\,\texttt{deepseek/deepseek-v4-pro} & DS-direct\,/\,Novita & \texttt{thinking: \{type: "enabled"\}} (DS), \texttt{reasoning: \{effort: "high"\}} (OR) \\
+DeepSeek V4-pro$^\dagger$
+  & \begin{tabular}[t]{@{}l@{}}\texttt{deepseek-v4-pro}\\\texttt{deepseek/}\\\texttt{deepseek-v4-pro}\end{tabular}
+  & \begin{tabular}[t]{@{}l@{}}\texttt{deepseek-v4-pro}\\\texttt{deepseek/}\\\texttt{deepseek-v4-pro}\end{tabular}
+  & Same model; DS-direct recoveries use native \texttt{thinking} on/off, OR originals use legacy \texttt{reasoning}. \\
 \midrule
-\multirow{2}{*}{\texttt{deepseek-v4-flash}}
-  & instruct  & \texttt{deepseek-chat}     & DeepSeek direct & (instruct alias) \\
-  & reasoning & \texttt{deepseek-reasoner} & DeepSeek direct & (reasoning alias) \\
+DeepSeek V4-flash
+  & \texttt{deepseek-chat}
+  & \texttt{deepseek-reasoner}
+  & DeepSeek direct aliases for instruct and reasoning paths. \\
 \midrule
-\multirow{2}{*}{\texttt{qwen3-235b}}
-  & instruct  & \texttt{qwen/qwen3-235b-a22b-2507}          & Novita  & instruct SKU \\
-  & reasoning & \texttt{qwen/qwen3-235b-a22b-thinking-2507} & Alibaba & thinking SKU \\
+Qwen3-235B
+  & \begin{tabular}[t]{@{}l@{}}\texttt{qwen/qwen3-}\\\texttt{235b-a22b-2507}\\(Novita)\end{tabular}
+  & \begin{tabular}[t]{@{}l@{}}\texttt{qwen/qwen3-}\\\texttt{235b-a22b-thinking-}\\\texttt{2507} (Alibaba)\end{tabular}
+  & Matched family and active-parameter count; upstream differs across siblings. \\
 \midrule
-\multirow{2}{*}{\texttt{qwen3-30b}}
-  & instruct  & \texttt{qwen/qwen3-30b-a3b-instruct-2507} & Nebius     & instruct SKU \\
-  & reasoning & \texttt{qwen/qwen3-30b-a3b-thinking-2507} & AtlasCloud & thinking SKU \\
+Qwen3-30B
+  & \begin{tabular}[t]{@{}l@{}}\texttt{qwen/qwen3-}\\\texttt{30b-a3b-instruct-}\\\texttt{2507} (Nebius)\end{tabular}
+  & \begin{tabular}[t]{@{}l@{}}\texttt{qwen/qwen3-}\\\texttt{30b-a3b-thinking-}\\\texttt{2507} (AtlasCloud)\end{tabular}
+  & Matched family and active-parameter count; upstream differs across siblings. \\
 \midrule
-anchor (no pair) & instruct & \texttt{anthropic/claude-opus-4.7} & Anthropic & reported separately \\
+anchor (no pair)
+  & Claude Opus 4.7
+  & --
+  & Closed-frontier anchor provisioned but excluded from the paired tests. \\
 \bottomrule
 \end{tabularx}
-\caption{Within-family pairs and upstream pinning. All OpenRouter
-requests use \texttt{allow\_fallbacks: false}. Within each Qwen pair the
+\caption{Within-family pairs and upstream pinning. OpenRouter fallback
+routing is disabled for all pinned requests. Within each Qwen pair the
 default upstream host differs across siblings (a soft serving-stack
 limitation; see \S\ref{sec:limitations}). $^\dagger$ The
-\texttt{deepseek-v4-pro} pair was originally pinned to OpenRouter via
-Novita; per the 2026-05-15 PREREGISTRATION amendment, cells that
-returned \texttt{provider\_error} or \texttt{empty\_probe\_answer} on
-OR were re-attempted through DeepSeek's first-party API. The final
-analyzable dataset is therefore \emph{mixed}: OR/Novita originals
-that succeeded plus DS-direct recoveries for cells that the originals
-did not produce. The slash-separated values list both
-configurations; see \S\ref{sec:methods:v4pro-routing} for the per-axis
-breakdown of the final mix.}
+\texttt{deepseek-v4-pro} pair is mixed after the 2026-05-15 amendment:
+OR/Novita originals are kept where they succeeded, and failed cells are
+recovered through DeepSeek-direct. See
+\S\ref{sec:methods:v4pro-routing} for the per-axis breakdown.}
 \label{tab:models}
 \end{table}
 
 \subsection{V4-pro routing amendment}
 \label{sec:methods:v4pro-routing}
 
-The \texttt{deepseek-v4-pro} pair was originally pinned to OpenRouter
+The DeepSeek V4-pro pair was originally pinned to OpenRouter
 via Novita, matching the upstream-pinning protocol applied to the other
 OR-served families. Three independent observations on 2026-05-15
 motivated a routing change to DeepSeek's first-party API
-(\texttt{api.deepseek.com}) for all V4-pro retries:
+for all V4-pro retries:
 (i)~\textbf{empty-response rate.}\ On long sycophancy and context-rot
 conversations the OR-served V4-pro reasoning member returned a large
 fraction of HTTP 200 responses with zero completion tokens, which our
 runner correctly recorded as
 \texttt{provider\_empty\_response} exclusions. Live testing against
-\texttt{api.deepseek.com} with the documented native parameter
-(\texttt{thinking: \{type: "enabled"\}}) and a budget of $16{,}384$
-tokens reproducibly returned a populated \texttt{content} field on the
-same prompts. (ii)~\textbf{the V4-family-native parameter is not
-honoured for the legacy \texttt{reasoning} keyword.}\ The DeepSeek
-documentation states explicitly that the V4 family uses
-\texttt{thinking: \{type: "enabled"\}}/\texttt{"disabled"}; the legacy
-\texttt{reasoning: \{enabled: bool\}} is silently ignored. Empirically
-we verified this on a controlled prompt: V4-pro responses with
-\texttt{reasoning: \{enabled: false\}} continued to emit non-zero
-reasoning tokens, whereas \texttt{thinking: \{type: "disabled"\}}
-produced reasoning tokens of zero. (iii)~\textbf{methodological
+DeepSeek-direct with the documented native thinking parameter and a
+budget of $16{,}384$ tokens reproducibly returned a populated
+\texttt{content} field on the same prompts. (ii)~\textbf{the
+V4-family-native parameter is not honoured for the legacy reasoning
+keyword.}\ DeepSeek documents V4 reasoning control through a native
+thinking parameter; the older reasoning keyword is silently ignored.
+Empirically, the older keyword continued to emit non-zero reasoning
+tokens, whereas the native disabled setting produced reasoning tokens
+of zero. (iii)~\textbf{methodological
 parity}: V4-flash already used DeepSeek-direct, so routing V4-pro the
 same way places both V4-family pairs on the model creator's API and
 removes a confound between the two pairs. The 75\% promotional
@@ -86,25 +86,33 @@ discount on V4-pro through 2026-05-31 made the routing change financially
 no worse than continuing on OR.
 
 The retry rows written through DeepSeek-direct supersede the
-\texttt{provider\_error} / \texttt{provider\_empty\_response} originals
-via the semantic dedup at analysis time
-(\S\ref{sec:methods:dedup}). Both rows remain in the raw JSONL
-audit trail; the analyzable set picked by
-\texttt{dedupe\_to\_latest} is composed of OR/Novita originals where
-they succeeded, plus DS-direct retries on cells where the OR-served
-original failed. Concretely (counts after dedup): on self-consistency,
-$820$ of $1{,}000$ V4-pro-instruct and $400$ of $1{,}000$ V4-pro-reasoning
-cells are OR-original; $180$ and $600$ respectively are DS-direct
-recoveries. On sycophancy, $600$ of $600$ V4-pro-instruct cells are
-OR-original; $260$ of $600$ V4-pro-reasoning are OR-original and the
-other $340$ are DS-direct recoveries. On context-rot, the mix is
-strongly OR-original: $1{,}187$ of $1{,}200$ V4-pro-instruct and
-$1{,}168$ of $1{,}200$ V4-pro-reasoning come from the original Novita
-sweep; the small DS-direct contributions ($13$ and $32$) are
-recoveries on the cells where Novita returned errors or empty bodies.
-The mix is heaviest on the reasoning sycophancy cells precisely
-because that was the cell type most affected by the
-\texttt{max\_tokens}{=}2048 bug.
+\texttt{provider\_error} and \texttt{provider\_empty\_response}
+originals via the semantic dedup at analysis time
+(\S\ref{sec:methods:dedup}). Both attempts remain in the raw JSONL audit
+trail. The analyzable set keeps OR/Novita originals where they
+succeeded, plus DS-direct retries on cells where the OR-served original
+failed.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+Axis & V4-pro instruct source & V4-pro reasoning source \\
+\midrule
+Self-consistency & $820$ OR / $180$ DS & $400$ OR / $600$ DS \\
+Sycophancy       & $600$ OR / $0$ DS   & $260$ OR / $340$ DS \\
+Context rot      & $1{,}187$ OR / $13$ DS & $1{,}168$ OR / $32$ DS \\
+\bottomrule
+\end{tabular}
+\caption{Post-dedup V4-pro routing mix. OR = original OpenRouter/Novita
+row; DS = DeepSeek-direct recovery row.}
+\label{tab:v4pro-routing-mix}
+\end{table}
+
+The mix is heaviest on the reasoning sycophancy cells precisely because
+that was the cell type most affected by the \texttt{max\_tokens}{=}2048
+bug.
 
 \subsection{Hyperparameters per experiment}
 
@@ -162,23 +170,22 @@ matched by task seed.}
 \subsection{Exclusion-rule definitions}
 
 The six exclusion classes (\S\ref{sec:method:ops}) are defined formally
-in \texttt{src/agent\_pathologies/analysis/exclusions.py} and applied at
-analyzer read-time. Class~(i), \texttt{provider\_error}, is
+in the analysis code and applied at analyzer read-time. Class~(i),
+\texttt{provider\_error}, is
 infrastructure-only and re-attempted on resume; classes~(ii)--(vi) are
 model-behaviour or serving-stack exclusions and are reported as-is.
 Legacy rows tagged \texttt{empty\_probe\_answer} prior to the
-2026-05-14 amendment are retroactively reclassified by
-\texttt{metrics.py::reclassify\_legacy\_exclusions} based on the
-\texttt{output\_tokens} field, idempotently.
+2026-05-14 amendment are retroactively reclassified from their token
+metadata, idempotently.
 
 \subsection{Semantic deduplication}
 \label{sec:methods:dedup}
 
 The raw JSONL is append-only: every retry attempt writes a new row,
 even when retrying the same logical (model-family, role, task,
-sweep-cell, seed) cell. For the analyzable dataset we apply
-\texttt{dedupe\_to\_latest} (\texttt{src/agent\_pathologies/analysis/metrics.py}),
-which keys cells on \emph{(model-family, role, task, sweep, seed)}---
+sweep-cell, seed) cell. For the analyzable dataset we apply semantic
+deduplication, which keys cells on
+\emph{(model-family, role, task, sweep, seed)}---
 intentionally broader than the runner's resume-key, which additionally
 distinguishes by the raw model identifier. This broader key collapses
 rows of the same logical cell that were served by different providers

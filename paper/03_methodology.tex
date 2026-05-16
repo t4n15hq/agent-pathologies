@@ -27,8 +27,8 @@ model \emph{families} that ship matched instruct and reasoning siblings:
         (\texttt{reasoning: \{enabled: false\}} for instruct,
         \texttt{reasoning: \{effort: "high"\}} for reasoning); per the
         2026-05-15 amendment a subset of cells was recovered via the
-        DeepSeek first-party API with the V4-family-native
-        \texttt{thinking: \{type: "enabled"\}}/\texttt{"disabled"} parameter.
+        DeepSeek first-party API with the V4-family-native thinking
+        parameter enabled or disabled.
         The final analyzable dataset therefore mixes OR/Novita
         originals with DS-direct recoveries on a per-cell basis; see
         \S\ref{sec:methods:v4pro-routing} for the rationale, accounting,
@@ -38,13 +38,13 @@ model \emph{families} that ship matched instruct and reasoning siblings:
         \texttt{deepseek-reasoner} route the same family through the
         instruct and reasoning code paths respectively.
   \item \textbf{Qwen3-235B (a22b).} Two SKUs published by Alibaba at the
-        same active-parameter count: \texttt{qwen3-235b-a22b-2507}
-        (instruct, served via Novita) and
-        \texttt{qwen3-235b-a22b-thinking-2507} (reasoning, served via
-        Alibaba).
-  \item \textbf{Qwen3-30B (a3b).} \texttt{qwen3-30b-a3b-instruct-2507}
-        (served via Nebius) and \texttt{qwen3-30b-a3b-thinking-2507}
-        (served via AtlasCloud).
+        same active-parameter count: the instruct SKU served via Novita
+        and the thinking SKU served via Alibaba. The exact model
+        identifiers are listed in Table~\ref{tab:models}.
+  \item \textbf{Qwen3-30B (a3b).} Matched instruct and thinking SKUs at
+        the same active-parameter count, served via Nebius and
+        AtlasCloud respectively. The exact model identifiers are listed
+        in Table~\ref{tab:models}.
 \end{enumerate}
 
 For DeepSeek pairs base architecture, scale, training run, and serving
@@ -59,7 +59,7 @@ separately so a reader can attribute any disagreement to the routing
 difference.
 
 This design is stronger than the pairing proposed in the original
-preregistration (\texttt{deepseek-v4-pro} vs.\ \texttt{deepseek-r1-0528}),
+preregistration (DeepSeek V4-pro vs.\ DeepSeek R1-0528),
 which crossed two distinct base models. The amendment log dated
 \textsl{2026-05-13 (further)} replaces that exploratory pairing with the
 within-model reasoning-toggle design above, eliminating the
@@ -190,15 +190,13 @@ counted.
 
 \paragraph{Verifiable scoring, no LLM judges.}
 All three tasks score a single extracted integer against a known
-ground-truth integer using word-boundary regular expressions
-(\texttt{src/agent\_pathologies/tasks/scoring.py}). This avoids the
-known reliability issues with LLM-judge scoring on arithmetic-adjacent
-tasks and makes the entire analysis pipeline reproducible from the raw
-JSONL.
+ground-truth integer using word-boundary regular expressions in the
+scoring module. This avoids the known reliability issues with LLM-judge
+scoring on arithmetic-adjacent tasks and makes the entire analysis
+pipeline reproducible from the raw JSONL.
 
 \paragraph{Paired by task seed.}
-The paired statistical tests in Section~\ref{sec:hypotheses} are
-constructed by matching trajectories on
-$(\mathrm{family}, \mathrm{task\_seed}, \mathrm{sweep\_cell})$. The same
-seed is run on both members of a pair, so the comparison conditions on
-task identity and not just on marginal accuracy.
+The paired statistical tests in Section~\ref{sec:hypotheses} match
+trajectories on family, task seed, and sweep cell. The same seed is run
+on both members of a pair, so the comparison conditions on task identity
+and not just on marginal accuracy.

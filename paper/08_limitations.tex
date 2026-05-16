@@ -19,17 +19,15 @@ DeepSeek and Qwen DiD estimates disagree. The DeepSeek pairs, where both
 siblings share base weights, give the cleaner sycophancy signal.
 
 \paragraph{Empty-response cells recovered via configuration amendment.}
-The original sweep produced a substantial
-\texttt{empty\_probe\_answer} / \texttt{provider\_empty\_response}
-class concentrated on DeepSeek reasoning members
-($\approx\!668$ on \texttt{deepseek-reasoner} and $\approx\!407$ on
-\texttt{deepseek-v4-pro} reasoning during stage-1 calibration), at first
-treated as a model-side behavioural signal. Diagnostic work on
+The original sweep produced a substantial empty-answer class
+concentrated on DeepSeek reasoning members ($\approx\!668$ on
+DeepSeek-reasoner and $\approx\!407$ on V4-pro reasoning during stage-1
+calibration), at first treated as a model-side behavioural signal.
+Diagnostic work on
 2026-05-15 traced these rows to an experimenter-configuration error:
 \texttt{max\_tokens}{=}2048 was below DeepSeek's recommended default of
-32K for reasoning models, so the entire budget was consumed by
-\texttt{reasoning\_content} (CoT), leaving zero tokens for
-\texttt{content} (the final visible answer). Per the same-day
+32K for reasoning models, so the entire budget was consumed by the
+reasoning trace, leaving zero tokens for the final visible answer. Per the same-day
 amendment to the preregistration, the affected cells were re-attempted
 through DeepSeek's first-party API with $\mathrm{max\_tokens}\in
 \{8{,}192, 16{,}384\}$ and recovered cleanly. The final analyzable
@@ -53,8 +51,8 @@ selective-intervention pattern strengthens or weakens at lower
 difficulties is left to a follow-up.
 
 \paragraph{No closed-frontier anchor in the primary results.}
-A stage-2 anchor on \texttt{anthropic/claude-opus-4.7} is provisioned
-in the configuration but is not part of the paired test
+A stage-2 Claude Opus 4.7 anchor is provisioned in the configuration
+but is not part of the paired test
 (\S\ref{sec:method:pairing}). The preregistration amendment dated
 2026-05-13 records the staged rollout: stage 1 is the paired Chinese
 open-weight slice; stage 2 is the closed-frontier anchor when budget

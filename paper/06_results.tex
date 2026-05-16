@@ -61,6 +61,19 @@ heaviest on the reasoning sycophancy cells most affected by the
 amendment log has the chronology.
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig1_headline_forest.pdf}
+\caption{Headline paired effects across the three pathology axes. Positive
+values are oriented as a reasoning advantage. Self-consistency is the
+largest and cleanest effect; sycophancy is heterogeneous; context rot is
+split between DeepSeek ceiling effects and Qwen capability-confounded
+gains.}
+\label{fig:headline_forest}
+\end{figure}
+
+\FloatBarrier
+
 \subsection{Self-consistency}
 \label{sec:results:selfconsistency}
 
@@ -128,9 +141,18 @@ Qwen-30B   & $0.032$ & $0.015$ & $-0.017$ \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig2_selfconsistency_paired.pdf}
+\caption{Self-consistency accuracy by family and role. Reasoning
+variants strongly outperform instruct siblings on hardness-$5$
+arithmetic in all four families.}
+\label{fig:selfconsistency_paired}
+\end{figure}
+
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{figures/fig6_qwen_mode_collapse.pdf}
+\includegraphics[width=0.98\linewidth]{figures/fig6_qwen_mode_collapse.pdf}
 \caption{Qwen instruct mode-collapse on hardness-5 arithmetic. For each
 Qwen instruct variant, the top-5 most-frequent extracted-integer
 answers across all task replays plus an aggregated ``(other)'' bin.
@@ -158,6 +180,8 @@ solely by the reasoning mode. The DeepSeek pairs, which are
 within-MODEL reasoning toggles holding everything else constant,
 provide the more controlled estimate of the reasoning-mode effect on
 this axis.
+
+\FloatBarrier
 
 \subsection{Sycophancy}
 \label{sec:results:sycophancy}
@@ -227,6 +251,26 @@ Qwen-30B  & $+0.860$ & $+0.760$ & $+0.900$ & $+0.880$ & $\mathbf{+0.850}$ & $[+0
 \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig3_sycophancy_did.pdf}
+\caption{Sycophancy difference-in-differences in the reasoning-gain
+convention. Positive values mean the reasoning sibling is less
+responsive to wrong-versus-correct pushback. The preregistered threshold
+is shown at $\pm 0.10$.}
+\label{fig:sycophancy_did}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig4_sycophancy_conditions.pdf}
+\caption{Sycophancy condition accuracies under wrong, correct, and
+neutral pushback. The Qwen instruct cells illustrate why the large Qwen
+reasoning gains must be read together with the capability-collapse
+caveat.}
+\label{fig:sycophancy_conditions}
+\end{figure}
+
 \paragraph{Capability/sycophancy confound on the Qwen pairs.}
 The DiD on Qwen pairs partially entangles two effects: a genuine
 sycophancy difference, and an underlying capability gap on hardness-$5$
@@ -237,6 +281,8 @@ specific number which the model copies, lifting the within-condition
 mode-collapse---both instruct siblings attempt the problem---so the
 DeepSeek DiD is the \emph{cleaner} sycophancy estimate. We report both
 explicitly and ask the reader to weight them accordingly.
+
+\FloatBarrier
 
 \subsection{Context rot}
 \label{sec:results:contextrot}
@@ -284,6 +330,15 @@ Qwen-30B  & collapsed      & $40$ & $0.720$ & $0.900$ & $0.472$               & 
 \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig5_contextrot_curves.pdf}
+\caption{Context-rot accuracy curves for irrelevant filler, split by
+family and role. DeepSeek instruct is already at ceiling, while the Qwen
+pairs show a visible reasoning advantage under long filler depth.}
+\label{fig:contextrot_curves}
+\end{figure}
+
 \paragraph{Pooled-cell secondary analysis.}
 Cell-level paired McNemar at $n_{\mathrm{paired}} \in [6, 18]$ per cell
 is underpowered---during stage-1 collection on V4-flash, the BH-corrected
@@ -320,6 +375,8 @@ We retain the row only to show that the within-pair pattern on V4-pro
 context-rot is dominated by ceiling.
 \end{table}
 
+\FloatBarrier
+
 \subsection{Cross-axis summary}
 \label{sec:results:cross}
 
@@ -351,6 +408,16 @@ Qwen-30B  & \textbf{Pos.} (\textsc{cap}) & \textbf{Pos.} (\textsc{cap}) & \textb
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/fig7_cross_axis_summary.pdf}
+\caption{Signed cross-axis summary. Positive values are oriented as a
+reasoning advantage. The heatmap visualizes the paper's central claim:
+reasoning is a selective intervention rather than a uniform robustness
+upgrade.}
+\label{fig:cross_axis_summary}
+\end{figure}
 
 The substantive claim of the paper is read off Table~\ref{tab:cross} and
 elaborated in the discussion: reasoning-enabled variants are a

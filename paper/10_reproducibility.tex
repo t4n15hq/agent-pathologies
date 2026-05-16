@@ -88,14 +88,10 @@ files are:
   \item \texttt{data/sycophancy\_clean.jsonl}: \texttt{5f36a88f\dots 0108371b}
 \end{itemize}
 Full hashes are pinned in the release tag and reproducible with
-\texttt{shasum -a 256 data/*\_clean.jsonl} after running
-\texttt{python scripts/clean\_dataset.py}.
+the standard SHA-256 command after running the clean-dataset script.
 
 \paragraph{Provider-pinning verification.}
-Every trajectory in the released JSONL carries an
-\texttt{extra.upstream\_pinned} field and an
-\texttt{extra.upstream\_actual} field. Exclusion rule \S6.4
-(\texttt{upstream\_mismatch}) drops any trajectory where the two differ.
-A reader can audit the entire dataset for routing correctness with one
-\texttt{jq} query against the JSONL.
-
+Every trajectory in the released JSONL carries both the intended
+upstream and the actual upstream returned by the provider. Exclusion
+rule \S6.4 drops any trajectory where the two differ. A reader can audit
+the entire dataset for routing correctness with a single JSONL query.
