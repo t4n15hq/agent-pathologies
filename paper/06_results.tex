@@ -13,7 +13,7 @@ instruct and thinking SKUs are served by \emph{different} upstreams
 (Novita vs.\ Alibaba; Nebius vs.\ AtlasCloud). This soft caveat applies
 to every Qwen result and is restated in-text.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\scriptsize
 \caption{Model pairs, upstream-provider pinning, total trajectories
 collected per (family, role), and exclusion counts by reason.
@@ -65,9 +65,9 @@ heaviest on the reasoning sycophancy cells most affected by the
 amendment log has the chronology.
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/fig1_headline_forest.pdf}
+\includegraphics[width=0.90\linewidth]{figures/fig1_headline_forest.pdf}
 \caption{Headline paired effects across the three pathology axes. Positive
 values are oriented as a reasoning advantage. Self-consistency is the
 largest and cleanest effect; sycophancy is heterogeneous; context rot is
@@ -102,7 +102,7 @@ where instruct is sometimes correct (V4-flash $0.316$), instruct is
 \emph{noisily} correct, whereas reasoning consistently lands on the
 right integer.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Self-consistency accuracy per family, paired by task on the
 $N=40$ hardness-$5$ arithmetic problems with $25$ replays per cell
@@ -126,7 +126,7 @@ Qwen-30B     & $0.000$ & $0.985$ & $+0.985$ & $[+0.959,+1.000]$ & $40\,/\,0\,/\,
 \end{tabular}
 \end{table}
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Self-consistency integer-extracted answer divergence per family.
 Divergence is $1-\mathrm{mode\ frequency}/N_{\mathrm{replays}}$ on the
@@ -145,28 +145,6 @@ Qwen-30B   & $0.032$ & $0.015$ & $-0.017$ \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/fig2_selfconsistency_paired.pdf}
-\caption{Self-consistency accuracy by family and role. Reasoning
-variants strongly outperform instruct siblings on hardness-$5$
-arithmetic in all four families.}
-\label{fig:selfconsistency_paired}
-\end{figure}
-
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/fig6_qwen_mode_collapse.pdf}
-\caption{Qwen instruct mode-collapse on hardness-5 arithmetic. For each
-Qwen instruct variant, the top-5 most-frequent extracted-integer
-answers across all task replays plus an aggregated ``(other)'' bin.
-A handful of placeholder integers (most prominently ``$1234$'') account
-for the majority of replays, which keeps integer-divergence small while
-accuracy remains at exactly $0$. The reasoning sibling does not exhibit
-this pattern.}
-\label{fig:qwen_mode_collapse}
-\end{figure}
-
 \paragraph{Qwen instruct: mode collapse, not noise.}
 The Qwen instruct accuracy of exactly $0.000$ on hardness-$5$ arithmetic
 is the empirical motivation for reporting accuracy and divergence
@@ -184,6 +162,28 @@ solely by the reasoning mode. The DeepSeek pairs, which are
 within-MODEL reasoning toggles holding everything else constant,
 provide the more controlled estimate of the reasoning-mode effect on
 this axis.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/fig2_selfconsistency_paired.pdf}
+\caption{Self-consistency accuracy by family and role. Reasoning
+variants strongly outperform instruct siblings on hardness-$5$
+arithmetic in all four families.}
+\label{fig:selfconsistency_paired}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/fig6_qwen_mode_collapse.pdf}
+\caption{Qwen instruct mode-collapse on hardness-5 arithmetic. For each
+Qwen instruct variant, the top-5 most-frequent extracted-integer
+answers across all task replays plus an aggregated ``(other)'' bin.
+A handful of placeholder integers (most prominently ``$1234$'') account
+for the majority of replays, which keeps integer-divergence small while
+accuracy remains at exactly $0$. The reasoning sibling does not exhibit
+this pattern.}
+\label{fig:qwen_mode_collapse}
+\end{figure}
 
 \FloatBarrier
 
@@ -207,7 +207,7 @@ cleanest pair: V4-flash's gain falls from $+0.240$ at $g=0$ to $+0.080$
 at $g=10$, suggesting reasoning's sycophancy resistance is strongest
 immediately after pushback and decays as filler accumulates.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Sycophancy per-family-role accuracy under the three pushback
 conditions (wrong / correct / neutral), collapsed across the four
@@ -233,7 +233,7 @@ Qwen-30B  & reasoning & $0.985$ & $0.990$ & $0.990$ & $0.045$ \\
 \end{tabular}
 \end{table}
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Sycophancy paired DiD per (family, post-pushback gap $g$),
 using the \emph{reasoning gain} convention
@@ -259,19 +259,16 @@ Qwen-30B  & $+0.860$ & $+0.760$ & $+0.900$ & $+0.880$ & $\mathbf{+0.850}$ & $[+0
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/fig3_sycophancy_did.pdf}
+\includegraphics[width=0.78\linewidth]{figures/fig3_sycophancy_did.pdf}
 \caption{Sycophancy difference-in-differences in the reasoning-gain
 convention. Positive values mean the reasoning sibling is less
 responsive to wrong-versus-correct pushback. The preregistered threshold
 is shown at $\pm 0.10$.}
 \label{fig:sycophancy_did}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/fig4_sycophancy_conditions.pdf}
+\vspace{0.6em}
+\includegraphics[width=0.78\linewidth]{figures/fig4_sycophancy_conditions.pdf}
 \caption{Sycophancy condition accuracies under wrong, correct, and
 neutral pushback. The Qwen instruct cells illustrate why the large Qwen
 reasoning gains must be read together with the capability-collapse
@@ -289,8 +286,6 @@ specific number which the model copies, lifting the within-condition
 mode-collapse---both instruct siblings attempt the problem---so the
 DeepSeek DiD is the \emph{cleaner} sycophancy estimate. We report both
 explicitly and ask the reader to weight them accordingly.
-
-\FloatBarrier
 
 \subsection{Context rot}
 \label{sec:results:contextrot}
@@ -317,7 +312,7 @@ filler counts, leaving no within-pair room for the reasoning sibling to
 improve. We label this honestly as a null on V4-flash rather than a
 reverse finding.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Context rot: paired accuracy per
 $(\mathrm{family}, \mathrm{kind}, n_{\mathrm{filler}})$ cell, with
@@ -347,9 +342,9 @@ Qwen-30B  & collapsed      & $40$ & $0.720$ & $0.900$ & $0.472$               & 
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/fig5_contextrot_curves.pdf}
+\includegraphics[width=0.90\linewidth]{figures/fig5_contextrot_curves.pdf}
 \caption{Context-rot accuracy curves for irrelevant filler, split by
 family and role. DeepSeek instruct is already at ceiling, while the Qwen
 pairs show a visible reasoning advantage under long filler depth.}
@@ -368,7 +363,7 @@ preregistration credibility (the cell-level McNemar remains the primary)
 while addressing the cell-level power problem. The pooled model is
 descriptive, not confirmatory.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Context rot, pooled-cell secondary: logistic mixed-effects
 fixed-effect coefficients on \texttt{is\_correct} (paired by
@@ -405,7 +400,7 @@ test crosses BH-$q < 0.05$ \emph{and} the effect-size threshold
 includes both genuine null findings and ceiling-bounded cases). The
 table is the joint preregistered headline.
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering\small
 \caption{Cross-axis pass/fail summary against the preregistered
 thresholds (\S\ref{sec:hypotheses}). \textbf{Pos.}\ = paired test
@@ -426,9 +421,9 @@ Qwen-30B  & \textbf{Pos.} (\textsc{cap}) & \textbf{Pos.} (\textsc{cap}) & \textb
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/fig7_cross_axis_summary.pdf}
+\includegraphics[width=0.90\linewidth]{figures/fig7_cross_axis_summary.pdf}
 \caption{Signed cross-axis summary. Positive values are oriented as a
 reasoning advantage. The heatmap visualizes the paper's central claim:
 reasoning is a selective intervention rather than a uniform robustness
