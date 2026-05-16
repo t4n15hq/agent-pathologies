@@ -49,6 +49,19 @@
 \newcommand{\NUM}{\textbf{[NUM]}}
 \newcommand{\TODO}[1]{\textbf{[TODO: #1]}}
 
+% Override the article-class abstract: by default it applies \small font
+% AND a \quotation-style indent on both margins, which makes the abstract
+% visually narrower and smaller than body text. We want it to match the
+% introduction's typography exactly.
+\makeatletter
+\renewenvironment{abstract}{%
+  \begin{center}{\bfseries\large\abstractname\vspace{-.5em}\vspace{\z@}}\end{center}%
+  \par\noindent\ignorespaces%
+}{%
+  \par\bigskip%
+}
+\makeatother
+
 \title{Reasoning Enablement as a Selective Intervention:\\
 A Preregistered Within-Family Study of Multi-Turn Pathologies}
 
