@@ -15,64 +15,38 @@ to every Qwen result and is restated in-text.
 
 \begin{table}[!htbp]
 \centering\scriptsize
-\caption{Model pairs, upstream-provider pinning, total trajectories
-collected per (family, role), and exclusion counts by reason.
-Asterisks mark the within-pair upstream-provider mismatch on the Qwen
-pairs. Exclusion counts are reported on a per-cell basis after dedupe:
-a cell is counted as excluded only if every attempt for that cell
-failed. Per PREREGISTRATION amendment 2026-05-15, DeepSeek-reasoning
-cells initially marked empty due to a configuration-level
-max\_tokens under-allocation (2048 vs.\ the DeepSeek-recommended 32K
-default for \texttt{deepseek-reasoner}) were re-run with
-max\_tokens$=$8192 on the first-party DeepSeek API; recovered
-trajectories appear in the analyzable counts, and the table reflects
-post-retry effective exclusions.}
+\caption{Per-pair coverage. Triples are $N$ for (self-cons, sycophancy,
+context-rot). Pre-rec.\ excl.\ are stage-1 empty-response counts on
+DeepSeek reasoning before the 2026-05-15 \texttt{max\_tokens} amendment;
+effective excl.\ counts cells where every attempt failed after dedup.
+$^*$ within-Qwen-pair upstream mismatch (\S\ref{sec:setup});
+$^\dagger$ V4-pro mixed OR/Novita + DS-direct recovery
+(\S\ref{sec:methods:v4pro-routing}).}
 \label{tab:pairs}
-\begin{tabular}{lllrrrr}
+{\small\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lllccrr@{}}
 \toprule
-Family & Role & Upstream & $N_{\mathrm{cells}}$ & $N_{\mathrm{analyzable}}$ & pre-recovery excl & effective excl \\
+Family & Role & Upstream & $N_{\mathrm{cells}}$ & $N_{\mathrm{analyzable}}$ & pre-rec. excl. & effective excl. \\
 \midrule
-V4-flash  & instruct  & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
-V4-flash  & reasoning & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $\approx668$ & $0+0+0$ \\
-V4-pro    & instruct  & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
-V4-pro    & reasoning & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $\approx407$ & $0+0+0$ \\
-Qwen-235B & instruct  & Novita$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
-Qwen-235B & reasoning & Alibaba$^*$          & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
-Qwen-30B  & instruct  & Nebius$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
-Qwen-30B  & reasoning & AtlasCloud$^*$       & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+V4-flash  & instruct  & DeepSeek-direct  & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
+V4-flash  & reasoning & DeepSeek-direct  & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & ${\approx}668$    & $0{+}0{+}0$ \\
+V4-pro    & instruct  & mixed$^\dagger$  & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
+V4-pro    & reasoning & mixed$^\dagger$  & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & ${\approx}407$    & $0{+}0{+}0$ \\
+Qwen-235B & instruct  & Novita$^*$       & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
+Qwen-235B & reasoning & Alibaba$^*$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
+Qwen-30B  & instruct  & Nebius$^*$       & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
+Qwen-30B  & reasoning & AtlasCloud$^*$   & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$               & $0{+}0{+}0$ \\
 \bottomrule
-\end{tabular}\\[2pt]
-\raggedright\footnotesize Triple shows $N$ for (self-consistency,
-sycophancy, context-rot). Pre-recovery exclusions are stage-1 totals
-before the 2026-05-15 max\_tokens amendment; exact per-axis splits are
-not preserved in this summary table. See \S\ref{sec:methods:v4pro-routing}
-and \S\ref{sec:limitations} for the routing recovery that cleared them.
-After the 2026-05-15 amendment recoveries
-(higher \texttt{max\_tokens}, V4-pro routing change to DS-direct, and
-re-attempts of \texttt{provider\_error}, \texttt{provider\_empty\_response},
-and \texttt{truncated\_at\_max\_tokens} cells), every (family, role, axis)
-cell is fully analyzable at its preregistered N. $^*$ Qwen instruct and
-reasoning members are served by \emph{different} OpenRouter upstreams;
-this is the within-pair upstream-mismatch caveat (\S\ref{sec:setup}).
-$^\dagger$ V4-pro was originally pinned to OR/Novita; per the 2026-05-15
-amendment, cells that failed on OR were re-attempted via DeepSeek's
-first-party API. The final analyzable V4-pro dataset is therefore
-\emph{mixed}---OR/Novita originals that succeeded plus DS-direct
-recoveries for the cells that did not---with the DS-direct share
-heaviest on the reasoning sycophancy cells most affected by the
-\texttt{max\_tokens}{=}2048 bug. Per-axis counts are in
-\S\ref{sec:methods:v4pro-routing}. The \texttt{PREREGISTRATION.md}
-amendment log has the chronology.
+\end{tabular}}
 \end{table}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.90\linewidth]{figures/fig1_headline_forest.pdf}
-\caption{Headline paired effects across the three pathology axes. Positive
-values are oriented as a reasoning advantage. Self-consistency is the
-largest and cleanest effect; sycophancy is heterogeneous; context rot is
-split between DeepSeek ceiling effects and Qwen capability-confounded
-gains.}
+\includegraphics[width=0.78\linewidth]{figures/fig1_headline_forest.pdf}
+\caption{Headline paired effects across the three pathology axes;
+positive$=$reasoning advantage. Self-consistency is the largest and
+cleanest effect; sycophancy is heterogeneous; context-rot splits
+between DeepSeek ceiling effects and Qwen capability-confounded gains.}
 \label{fig:headline_forest}
 \end{figure}
 
