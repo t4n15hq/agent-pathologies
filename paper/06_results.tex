@@ -14,9 +14,9 @@ instruct and thinking SKUs are served by \emph{different} upstreams
 to every Qwen result and is restated in-text.
 
 \begin{table}[ht]
-\centering\small
+\centering\scriptsize
 \caption{Model pairs, upstream-provider pinning, total trajectories
-collected per (family, role), and effective exclusion counts by reason.
+collected per (family, role), and exclusion counts by reason.
 Asterisks mark the within-pair upstream-provider mismatch on the Qwen
 pairs. Exclusion counts are reported on a per-cell basis after dedupe:
 a cell is counted as excluded only if every attempt for that cell
@@ -28,22 +28,26 @@ max\_tokens$=$8192 on the first-party DeepSeek API; recovered
 trajectories appear in the analyzable counts, and the table reflects
 post-retry effective exclusions.}
 \label{tab:pairs}
-\begin{tabular}{lllrrr}
+\begin{tabular}{lllrrrr}
 \toprule
-Family & Role & Upstream & $N_{\mathrm{cells}}$ & $N_{\mathrm{analyzable}}$ & effective excl \\
+Family & Role & Upstream & $N_{\mathrm{cells}}$ & $N_{\mathrm{analyzable}}$ & pre-recovery excl & effective excl \\
 \midrule
-V4-flash  & instruct  & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-V4-flash  & reasoning & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-V4-pro    & instruct  & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-V4-pro    & reasoning & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-Qwen-235B & instruct  & Novita$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-Qwen-235B & reasoning & Alibaba$^*$          & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-Qwen-30B  & instruct  & Nebius$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
-Qwen-30B  & reasoning & AtlasCloud$^*$       & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0+0+0$ \\
+V4-flash  & instruct  & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+V4-flash  & reasoning & DeepSeek-direct      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $\approx668$ & $0+0+0$ \\
+V4-pro    & instruct  & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+V4-pro    & reasoning & mixed$^\dagger$      & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $\approx407$ & $0+0+0$ \\
+Qwen-235B & instruct  & Novita$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+Qwen-235B & reasoning & Alibaba$^*$          & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+Qwen-30B  & instruct  & Nebius$^*$           & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
+Qwen-30B  & reasoning & AtlasCloud$^*$       & $1000{+}600{+}1200$ & $1000{+}600{+}1200$ & $0$ & $0+0+0$ \\
 \bottomrule
 \end{tabular}\\[2pt]
 \raggedright\footnotesize Triple shows $N$ for (self-consistency,
-sycophancy, context-rot). After the 2026-05-15 amendment recoveries
+sycophancy, context-rot). Pre-recovery exclusions are stage-1 totals
+before the 2026-05-15 max\_tokens amendment; exact per-axis splits are
+not preserved in this summary table. See \S\ref{sec:methods:v4pro-routing}
+and \S\ref{sec:limitations} for the routing recovery that cleared them.
+After the 2026-05-15 amendment recoveries
 (higher \texttt{max\_tokens}, V4-pro routing change to DS-direct, and
 re-attempts of \texttt{provider\_error}, \texttt{provider\_empty\_response},
 and \texttt{truncated\_at\_max\_tokens} cells), every (family, role, axis)
@@ -173,7 +177,7 @@ divergence ($0.032$--$0.051$) that would falsely suggest a stable
 solver. The accuracy-paired test was preregistered to catch exactly
 this confound, and Figure~\ref{fig:qwen_mode_collapse} characterizes
 the failure mode directly. We therefore frame the Qwen pairs as
-\emph{capability-recovery} comparisons in §\ref{sec:discussion}: the
+\emph{capability-recovery} comparisons in \S\ref{sec:discussion}: the
 $+97.8$\,/\,$+98.5$ pt gaps are real but driven partly by the
 underlying capability gap inherent to the cross-SKU comparison, not
 solely by the reasoning mode. The DeepSeek pairs, which are
@@ -198,6 +202,10 @@ direction the user pushes, so positive $\mathrm{gain}$ means the
 reasoning sibling has a smaller gap and is less sycophantic. The
 preregistered effect threshold is $|\mathrm{gain}| \geq 0.10$ on the
 proportion scale (\S\ref{sec:hypotheses}).
+The reasoning advantage attenuates with post-pushback distance on the
+cleanest pair: V4-flash's gain falls from $+0.240$ at $g=0$ to $+0.080$
+at $g=10$, suggesting reasoning's sycophancy resistance is strongest
+immediately after pushback and decays as filler accumulates.
 
 \begin{table}[ht]
 \centering\small
@@ -287,10 +295,19 @@ explicitly and ask the reader to weight them accordingly.
 \subsection{Context rot}
 \label{sec:results:contextrot}
 
-Context rot is the most nuanced axis and we present it without
-overclaiming. It is also the least clean axis in the study: the
-DeepSeek pairs are ceiling-bound, while the Qwen gains are partially
-entangled with the same capability gap documented above.
+Context rot is split cleanly between two regimes. On the DeepSeek pairs
+the instruct sibling already solves the $20$-update variable-tracking
+task at $\sim 1.000$ accuracy across all filler depths, leaving no
+within-pair headroom for reasoning to improve; we report this as a
+ceiling-bound null. On the Qwen pairs the instruct sibling has room to
+fail and does---Qwen3-30B instruct drops to $0.500$ accuracy at
+$n_{\mathrm{filler}}=40$ under irrelevant filler, while the reasoning
+sibling holds $0.960$ ($h=1.168$, BH-$q=1.9{\times}10^{-5}$). The Qwen
+gain is large but partially entangled with the same hardness-$5$
+capability gap documented in \S\ref{sec:results:selfconsistency}, so we
+read the magnitude through the capability-confound lens
+(\S\ref{sec:discussion:capability}) while treating the direction as
+evidence of what context-rot recovery looks like when there is headroom.
 Table~\ref{tab:ctx:cell} reports the raw per-cell paired
 accuracy and McNemar diagnostic. The pattern that emerged on the
 deepest-sampled pair (V4-flash) during stage-1 collection is a strong

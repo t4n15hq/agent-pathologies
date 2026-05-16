@@ -1,30 +1,21 @@
-Multi-turn pathologies in large language models---self-consistency drift,
-context rot, and sycophancy---have each been documented in isolation.
-What remains unclear is whether a model's \emph{reasoning-enabled}
-variant changes these failures uniformly, or only on some axes. We test
-this with a preregistered, paired study of four Chinese open-weight model
-families: DeepSeek V4-pro, DeepSeek V4-flash, Qwen3-235B, and Qwen3-30B.
-Each family contributes an instruct member and a reasoning member. The
-DeepSeek pairs provide the cleanest contrast: the same underlying model,
-served by the same upstream, toggled between reasoning on and reasoning
-off at request time. The Qwen pairs match base family and active
-parameter count, but their instruct and thinking SKUs use different
-upstream providers, which we treat as a caveat throughout.
+We test whether reasoning-enabled variants uniformly improve multi-turn
+pathology resistance using a preregistered within-family paired design
+on four Chinese open-weight model pairs (DeepSeek V4-pro, V4-flash,
+Qwen3-235B, Qwen3-30B). They do not. Reasoning enablement is a
+selective intervention: large universal gains on self-consistency
+($\Delta_{\mathrm{acc}}$ $+0.67$ to $+0.99$, BH-$q < 10^{-11}$),
+heterogeneous on sycophancy (clean within-MODEL gain of $+0.165$ on
+V4-flash but null at threshold on V4-pro under the same toggle),
+ceiling-bound on context rot for DeepSeek, and capability-confounded on
+Qwen. Each family contributes an instruct member and a reasoning member.
+The DeepSeek pairs provide the cleanest contrast: the same underlying
+model, served by the same upstream, toggled between reasoning on and
+reasoning off at request time. The Qwen pairs match base family and
+active parameter count, but their instruct and thinking SKUs use
+different upstream providers, which we treat as a caveat throughout.
 
 Hypotheses, primary metrics, effect-size thresholds, multiple-comparisons
 correction, exclusion rules, and falsification criteria were locked before
 real-model data collection. We measure three verifiable, integer-scored
 tasks: hard arithmetic self-consistency, $20$-update variable tracking,
-and arithmetic-with-pushback. Reasoning-enabled variants show large and
-universal self-consistency advantages ($\Delta_{\mathrm{acc}}$ of
-$+0.67$ to $+0.99$ across the four pairs, sign-test BH-$q < 10^{-11}$
-in every family). Sycophancy is heterogeneous: V4-flash shows a clean
-within-MODEL reasoning gain ($+0.165$, BH-$q \approx
-5{\times}10^{-4}$), V4-pro is null at threshold ($+0.045$, CI
-$[-0.06, +0.15]$), and Qwen shows larger but capability-confounded gains.
-Context rot is the least clean axis: DeepSeek is ceiling-bound, while
-Qwen shows a substantial reasoning advantage entangled with instruct-side
-mode collapse. We interpret reasoning enablement as a \emph{selective}
-intervention---reliably effective on hard single-shot inference,
-heterogeneous on pushback resistance, and not a universal fix for
-multi-turn state tracking.
+and arithmetic-with-pushback.
