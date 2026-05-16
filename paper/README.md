@@ -2,7 +2,7 @@
 
 LaTeX source for the preprint *Reasoning Enablement as a Selective
 Multi-Turn Pathology Intervention: A Preregistered Within-Family Study
-of Four Chinese Open-Weight Model Pairs*.
+of Four Open-Weight Model Pairs*.
 
 The paper is structurally complete and compiles to `main.pdf` via
 `tectonic main.tex` (single-binary modern LaTeX engine) or any standard

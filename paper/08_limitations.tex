@@ -54,7 +54,7 @@ difficulties is left to a follow-up.
 A stage-2 Claude Opus 4.7 anchor is provisioned in the configuration
 but is not part of the paired test
 (\S\ref{sec:method:pairing}). The preregistration amendment dated
-2026-05-13 records the staged rollout: stage 1 is the paired Chinese
+2026-05-13 records the staged rollout: stage 1 is the paired
 open-weight slice; stage 2 is the closed-frontier anchor when budget
 permits. The headline within-family claim is independent of the anchor.
 
@@ -85,8 +85,9 @@ free-form natural-language tasks where wrong answers can be more
 gracefully smuggled.
 
 \paragraph{Provider scope.}
-Within-family pairs are restricted to Chinese open-weight families
-because, at time of writing, those are the families that ship matched
-instruct and reasoning siblings at the same scale. We do not claim the
-within-family pattern generalises to closed-frontier reasoning models
-without further data.
+Within-family pairs are restricted to open-weight families that ship
+matched instruct and reasoning siblings — at time of writing, this is
+the DeepSeek V4 family (within-MODEL reasoning toggle on shared
+weights) and the Qwen3 family (cross-SKU at matched scale). We do not
+claim the within-family pattern generalises to closed-frontier
+reasoning models without further data.
